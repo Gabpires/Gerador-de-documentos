@@ -1,0 +1,23 @@
+{
+  "name": "gerador-documentos-paraiba-imoveis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gerador local de documentos da Paraíba Imóveis.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "start": "npm run dev",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:visual": "playwright test --project=chromium --project=mobile-chrome",
+    "test:report": "playwright show-report",
+    "check": "npm run test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "vite": "^7.3.1"
+  }
+}
