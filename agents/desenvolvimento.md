@@ -6,9 +6,9 @@ Implementar mudanças de forma pequena, compreensível e reversível, preservand
 
 ## Área de atuação
 
-- `index.html`: estrutura, semântica e acessibilidade dos fluxos.
-- `script.js`: regras de emissão, validação, armazenamento local, histórico, modelos e impressão.
-- `styles.css`: apenas quando a mudança também exigir apresentação.
+- `src/index.html`: estrutura, semântica e acessibilidade dos fluxos.
+- `src/scripts/script.js`: regras de emissão, validação, armazenamento local, histórico, modelos e impressão.
+- `src/styles/styles.css`: apenas quando a mudança também exigir apresentação.
 - `tests/e2e`: atualize cenários que representem a mudança de comportamento.
 
 ## Procedimento

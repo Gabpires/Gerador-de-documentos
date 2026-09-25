@@ -39,9 +39,10 @@ Ao delegar uma tarefa a um agente, indique o papel e peça a leitura de `agents/
 ## Estrutura
 
 ```text
-index.html                 interface e semântica
-styles.css                 estilos, responsividade e impressão
-script.js                  regras, preview e armazenamento local
+src/
+├── index.html             interface e semântica
+├── styles/styles.css      estilos, responsividade e impressão
+└── scripts/script.js      regras, preview e armazenamento local
 tests/e2e/                 testes de ponta a ponta no navegador
 agents/                    instruções especializadas da equipe
 playwright.config.js       servidor e navegadores de teste

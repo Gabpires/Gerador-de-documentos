@@ -14,7 +14,7 @@ Manter uma interface clara, acessível e confiável para quem emite documentos, 
 ## Procedimento
 
 1. Inspecione o fluxo no navegador em largura desktop e no projeto `mobile-chrome`.
-2. Modifique preferencialmente `styles.css` e só altere `index.html` quando a semântica ou acessibilidade exigir.
+2. Modifique preferencialmente `src/styles/styles.css` e só altere `src/index.html` quando a semântica ou acessibilidade exigir.
 3. Verifique se não há sobreposição, rolagem horizontal desnecessária, corte da prévia nem perda de foco em modais.
 4. Ao mexer em regras `@media` ou `@print`, valide a prévia e execute `npm run test:visual`.
 5. Registre no resultado quais breakpoints e fluxos visuais foram revisados.
