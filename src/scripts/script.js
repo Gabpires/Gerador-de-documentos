@@ -2,7 +2,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const KEY = 'paraibaImoveisRecibosV3';
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 const MIGRATION_BACKUP_KEY = KEY+'_antes_schema_'+SCHEMA_VERSION;
 const MAX_AMOUNT = 999999999.99;
 const PAGE_SIZE = 50;
@@ -13,6 +13,7 @@ const campos = ['amount','tenant','cpf','property','contractCode','dueDay','refe
 const pagamentos = ['Dinheiro','Pix','Dinheiro/PIX','Transferência bancária','Boleto'];
 const errorFields = ['amount','tenant','cpf','property','contractCode','dueDay','reference','payment','receiptDate','operator'];
 const DOCUMENT_TYPES={receipt:{label:'Recibo',prefix:'REC'},declaration:{label:'Declaração',prefix:'DECL'},term:{label:'Termo',prefix:'TERMO'},contract:{label:'Contrato',prefix:'CONT'}};
+const DOCUMENT_STATUSES=['draft','review','issued','sent','awaiting_signature','signed','rejected','canceled','archived'];
 const GENERIC_TYPES=['declaration','term','contract'];
 const CLAUSE_LIBRARY={payment:'O pagamento será realizado nos valores, prazos e condições estabelecidos neste instrumento, incidindo os encargos legais e contratuais em caso de atraso.',maintenance:'A parte responsável obriga-se a conservar o imóvel e seus acessórios, respondendo pelos danos que causar e devolvendo-os nas condições ajustadas, ressalvado o desgaste natural.',adjustment:'Os valores serão reajustados na periodicidade permitida pela legislação, de acordo com o índice indicado neste instrumento ou outro que legalmente o substitua.',termination:'O descumprimento das obrigações poderá ensejar a rescisão, observados os avisos, prazos e penalidades previstos neste instrumento e na legislação aplicável.',inspection:'As partes reconhecem a vistoria como referência para a conservação do imóvel e para a apuração de eventuais danos ao término da relação contratual.'};
 const genericErrorIds=['docTitle','docDate','docCity','docDeclarant','docDeclarantDocument','docSubject','docBody','docPartyOne','docProperty','docObligations','docContractProperty','docCustomClauses'];
@@ -34,7 +35,7 @@ let activeGenericRecord=null;
 let editingGenericDraftId='';
 let genericDirty=false;
 
-function statusRegistro(r){ return r && r.status === 'canceled' ? 'canceled' : 'issued'; }
+function statusRegistro(r){ return r && DOCUMENT_STATUSES.includes(r.status) ? r.status : 'issued'; }
 function normalizarTexto(v){
   return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 }
@@ -91,7 +92,7 @@ function normalizarCamposGenericos(fields){
 }
 function normalizarDocumentoGenerico(r,{draft=false}={}){
   if(!r||typeof r!=='object'||!GENERIC_TYPES.includes(r.type))return null;
-  const status=draft?'draft':(['issued','canceled','archived'].includes(r.status)?r.status:'issued');
+  const status=draft?'draft':(DOCUMENT_STATUSES.includes(r.status)?r.status:'issued');
   const fields=normalizarCamposGenericos(r.fields);
   return {id:String(r.id||idDocumento()),type:r.type,templateVersion:Math.max(1,Number(r.templateVersion)||1),templateId:String(r.templateId||''),number:draft?'':String(r.number||''),year:Number(r.year)||Number(String(fields.docDate||hoje()).slice(0,4))||new Date().getFullYear(),status,letterhead:['none','first','repeat'].includes(r.letterhead)?r.letterhead:(['none','first','repeat'].includes(fields.docLetterhead)?fields.docLetterhead:'none'),footerEnabled:r.footerEnabled===true||fields.docFooterEnabled===true,fields,operator:operadores.includes(r.operator)?r.operator:(operadores.includes(fields.docOperator)?fields.docOperator:operadores[0]),createdAt:typeof r.createdAt==='string'?r.createdAt:'',updatedAt:typeof r.updatedAt==='string'?r.updatedAt:'',canceledAt:typeof r.canceledAt==='string'?r.canceledAt:'',canceledBy:operadores.includes(r.canceledBy)?r.canceledBy:'',cancelReason:String(r.cancelReason||'').slice(0,500),archivedAt:typeof r.archivedAt==='string'?r.archivedAt:'',printCount:Math.max(0,Number(r.printCount)||0),lastPrintedAt:typeof r.lastPrintedAt==='string'?r.lastPrintedAt:''};
 }
@@ -99,7 +100,7 @@ function normalizarModelo(t){if(!t||typeof t!=='object'||!GENERIC_TYPES.includes
 function normalizarModelos(lista){return (Array.isArray(lista)?lista:[]).map(normalizarModelo).filter(Boolean).slice(0,500);}
 function lerEstado(){
   const raw=localStorage.getItem(KEY);
-  if(!raw) return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,meta:metaNormalizada({})};
+  if(!raw) return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,management:{},meta:metaNormalizada({})};
   try{
     const s=JSON.parse(raw);
     if(s && typeof s==='object'){
@@ -112,6 +113,7 @@ function lerEstado(){
       documents:(Array.isArray(s.documents)?s.documents:[]).map(r=>normalizarDocumentoGenerico(r)).filter(Boolean),
       draftDocuments:(Array.isArray(s.draftDocuments)?s.draftDocuments:[]).map(r=>normalizarDocumentoGenerico(r,{draft:true})).filter(Boolean),
       templates:normalizarModelos(s.templates),contacts:normalizarCadastros(s.contacts),draft:normalizarRascunho(s.draft),
+      management:s.management&&typeof s.management==='object'?s.management:{},
       meta:metaNormalizada(s.meta)
       };
     }
@@ -119,7 +121,7 @@ function lerEstado(){
   }catch(e){
     recoveryRaw=raw;storageCorrupted=true;
   }
-  return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,meta:metaNormalizada({})};
+  return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,management:{},meta:metaNormalizada({})};
 }
 function persistir(next){
   if(storageCorrupted){toast('Primeiro baixe os dados para recuperação ou confirme o início de um histórico vazio.',true);return false;}
@@ -133,6 +135,7 @@ function persistir(next){
       templates:Array.isArray(next.templates)?next.templates:[],
       contacts:Array.isArray(next.contacts)?next.contacts:[],
       draft:next.draft===undefined?normalizarRascunho(state&&state.draft):normalizarRascunho(next.draft),
+      management:next.management&&typeof next.management==='object'?next.management:(state&&state.management&&typeof state.management==='object'?state.management:{}),
       meta:metaNormalizada(next.meta||state.meta)
     };
     localStorage.setItem(KEY,JSON.stringify(normalized));
@@ -364,7 +367,7 @@ function baixarDadosRecuperacao(){
 function iniciarHistoricoVazio(){
   if(!storageCorrupted||!confirm('Isso substituirá os dados locais corrompidos por um histórico vazio. Confirma?'))return;
   localStorage.removeItem(KEY);storageCorrupted=false;recoveryRaw='';
-  state={counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,meta:metaNormalizada({})};
+  state={counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,management:{},meta:metaNormalizada({})};
   persistir(state);activeRecord=null;draftDirty=false;historyPage=1;
   limpar();renderHistorico();atualizar();toast('Novo histórico iniciado.');
 }
@@ -396,10 +399,11 @@ function atualizar(){
   $('documentStatus').classList.toggle('canceled',status==='canceled');
   if(status==='issued') $('documentStatus').textContent='Recibo '+d.number+' emitido e registrado. Os dados estão travados para reimpressão.';
   else if(status==='canceled') $('documentStatus').textContent='Recibo '+d.number+' cancelado. O número permanece reservado no histórico.';
+  else if(status!=='draft') $('documentStatus').textContent='Recibo '+d.number+' — '+rotuloStatus(status).toLowerCase()+'.';
   else if(state.draft&&!draftDirty&&state.draft.savedAt) $('documentStatus').textContent='Rascunho salvo em '+dataHora(state.draft.savedAt)+'. Continue a edição ou emita quando estiver pronto.';
   else $('documentStatus').textContent='Rascunho — preencha e confira os dados antes de emitir.';
 
-  $('previewBadge').hidden=status==='issued';
+  $('previewBadge').hidden=!['draft','canceled'].includes(status);
   $('previewBadge').textContent=status==='canceled'?'RECIBO CANCELADO':'RASCUNHO — NÃO EMITIDO';
   $('previewBadge').classList.toggle('canceled',status==='canceled');
   $('printBtn').disabled=!activeRecord;
@@ -589,8 +593,8 @@ function botaoHistorico(label,acao,classe=''){
   b.addEventListener('click',evento=>{const menu=b.closest('.history-menu');if(menu)menu.open=false;acao(evento);});return b;
 }
 function rotuloTipo(tipo){return DOCUMENT_TYPES[tipo]?DOCUMENT_TYPES[tipo].label:'Documento';}
-function statusDocumento(r){return ['draft','issued','canceled','archived'].includes(r&&r.status)?r.status:'issued';}
-function rotuloStatus(status){return {draft:'Rascunho',issued:'Emitido',canceled:'Cancelado',archived:'Arquivado'}[status]||'Emitido';}
+function statusDocumento(r){return DOCUMENT_STATUSES.includes(r&&r.status)?r.status:'issued';}
+function rotuloStatus(status){return {draft:'Rascunho',review:'Em revisão',issued:'Emitido',sent:'Enviado',awaiting_signature:'Aguardando assinatura',signed:'Assinado',rejected:'Recusado',canceled:'Cancelado',archived:'Arquivado'}[status]||'Emitido';}
 function chaveContadorDocumento(tipo,ano){return tipo+'|'+ano;}
 function proximaSequenciaDocumento(tipo,ano){const chave=chaveContadorDocumento(tipo,ano),usados=state.documents.filter(r=>r.type===tipo&&Number(r.year)===Number(ano)).map(r=>{const m=String(r.number||'').match(/-(\d+)\//);return m?Number(m[1]):0;});return Math.max(1,Number(state.documentCounters[chave])||1,Math.max(0,...usados)+1);}
 function numeroDocumento(tipo,data){const ano=Number(String(data||hoje()).slice(0,4))||new Date().getFullYear();return DOCUMENT_TYPES[tipo].prefix+'-'+String(proximaSequenciaDocumento(tipo,ano)).padStart(3,'0')+'/'+ano;}
@@ -751,7 +755,7 @@ function confirmarEmissao(){
   const next={
     counters:{...state.counters,[k]:Math.max(proxSeq(d.year),Number(d.number.split('/')[0])+1)},
     history:[...state.history,registro],contacts,
-    draft:null,meta:{...state.meta,defaultOperator:d.operator}
+    draft:null,management:state.management||{},meta:{...state.meta,defaultOperator:d.operator}
   };
   if(!persistir(next)) return;
   pendingIssue=null;fecharModal('confirmModal');
@@ -928,7 +932,7 @@ function normalizarBackup(payload){
   const draftDocuments=(Array.isArray(fonte.draftDocuments)?fonte.draftDocuments:[]).map(r=>normalizarDocumentoGenerico(r,{draft:true})).filter(Boolean);
   const templates=normalizarModelos(fonte.templates);
   const docNumbers=new Set();for(const d of documents){if(!d.number||docNumbers.has(d.number))throw new Error('Há documentos com numeração ausente ou repetida no backup.');if(Object.keys(validarDocumentoGenerico(d)).length)throw new Error('Há '+rotuloTipo(d.type).toLowerCase()+' com campos obrigatórios inválidos no backup.');docNumbers.add(d.number);}
-  return {counters,documentCounters,history:[...unicos.values()],documents,draftDocuments,templates,contacts,draft:normalizarRascunho(fonte.draft),meta:metaNormalizada(fonte.meta),
+  return {counters,documentCounters,history:[...unicos.values()],documents,draftDocuments,templates,contacts,draft:normalizarRascunho(fonte.draft),management:fonte.management&&typeof fonte.management==='object'?fonte.management:{},meta:metaNormalizada(fonte.meta),
     _importStats:{ignoredContacts:Math.max(0,contatosOriginais.length-contacts.length)}};
 }
 function importarBackup(file){
@@ -967,7 +971,7 @@ function importarBackup(file){
       if(!confirm('Importar '+resumo+'? O histórico atual será preservado.')) return;
       const seguranca={...state,meta:{...state.meta,lastBackupAt:new Date().toISOString()}};
       baixarBackupEstado(seguranca,'backup-antes-importacao');
-      if(!persistir({counters,documentCounters,history,documents,draftDocuments,templates,contacts,draft:state.draft||incoming.draft,meta:seguranca.meta})) return;
+      if(!persistir({counters,documentCounters,history,documents,draftDocuments,templates,contacts,draft:state.draft||incoming.draft,management:incoming.management&&Object.keys(incoming.management).length?incoming.management:state.management,meta:seguranca.meta})) return;
       historyPage=1;renderCadastros();renderHistorico();renderModelos();atualizar();if(currentDocumentType!=='receipt')atualizarDocumentoGenerico();toast('Backup importado: '+resumo+'.');
     }catch(e){toast('Não foi possível importar. '+(e.message||'Arquivo inválido.'),true);}
     finally{$('importFile').value='';}
