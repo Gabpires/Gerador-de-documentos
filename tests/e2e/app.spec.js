@@ -7,8 +7,16 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+async function selecionarAba(page, name) {
+  const toggle = page.locator('#appMenuToggle');
+  if (await toggle.isVisible() && await toggle.getAttribute('aria-expanded') !== 'true') {
+    await toggle.click();
+  }
+  await page.getByRole('tab', { name }).click();
+}
+
 async function preencherReciboValido(page) {
-  await page.getByRole('tab', { name: /Novo documento/i }).click();
+  await selecionarAba(page, /Novo documento/i);
   await page.locator('#tenant').fill('Maria da Silva');
   await page.locator('#cpf').fill('52998224725');
   await page.locator('#property').fill('Rua das Acácias, 100, Centro');
@@ -22,27 +30,27 @@ test('carrega o gerador com a gestão como centro de navegação', async ({ page
   await expect(page.getByRole('heading', { name: 'Gerador de documentos' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Gestão documental' })).toBeVisible();
 
-  await page.getByRole('tab', { name: /Dossiês/i }).click();
+  await selecionarAba(page, /Dossiês/i);
   await expect(page.getByRole('heading', { name: /Dossiês por imóvel/i })).toBeVisible();
 
-  await page.getByRole('tab', { name: /Novo documento/i }).click();
+  await selecionarAba(page, /Novo documento/i);
   await expect(page.locator('#view-new')).toBeVisible();
 
-  await page.getByRole('tab', { name: /Histórico/i }).click();
+  await selecionarAba(page, /Histórico/i);
   await expect(page.locator('#view-history')).toBeVisible();
 
-  await page.getByRole('tab', { name: /Cadastros/i }).click();
+  await selecionarAba(page, /Cadastros/i);
   await expect(page.locator('#view-contacts')).toBeVisible();
 
-  await page.getByRole('tab', { name: /Modelos/i }).click();
+  await selecionarAba(page, /Modelos/i);
   await expect(page.locator('#view-templates')).toBeVisible();
 
-  await page.getByRole('tab', { name: /Backup e segurança/i }).click();
+  await selecionarAba(page, /Backup e segurança/i);
   await expect(page.locator('#view-safety')).toBeVisible();
 });
 
 test('valida os dados obrigatórios antes de emitir um recibo', async ({ page }) => {
-  await page.getByRole('tab', { name: /Novo documento/i }).click();
+  await selecionarAba(page, /Novo documento/i);
   await page.locator('#issueBtn').click();
 
   await expect(page.locator('#amountError')).toContainText('Informe um valor');
@@ -63,7 +71,7 @@ test('emite um recibo válido e o mantém no histórico local', async ({ page })
   await expect(page.locator('#documentStatus')).toContainText('emitido e registrado');
   await expect(page.locator('#printBtn')).toBeEnabled();
 
-  await page.getByRole('tab', { name: /Histórico/i }).click();
+  await selecionarAba(page, /Histórico/i);
   await expect(page.locator('#historyList')).toContainText('Maria da Silva');
 
   const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
@@ -81,7 +89,7 @@ test('não aceita CPF inválido', async ({ page }) => {
 });
 
 test('emite uma declaração e preserva sua numeração', async ({ page }) => {
-  await page.getByRole('tab', { name: /Novo documento/i }).click();
+  await selecionarAba(page, /Novo documento/i);
   await page.getByRole('button', { name: 'Declaração', exact: true }).click();
   await page.locator('#docTitle').fill('DECLARAÇÃO DE RESIDÊNCIA');
   await page.locator('#docDate').fill('2026-09-25');
@@ -100,7 +108,7 @@ test('emite uma declaração e preserva sua numeração', async ({ page }) => {
 });
 
 test('cadastra clientes PF e PJ e aplica a qualificação completa no contrato', async ({ page }) => {
-  await page.getByRole('tab', { name: /Clientes/i }).click();
+  await selecionarAba(page, /Clientes/i);
   await page.locator('#clientName').fill('Marina de Exemplo');
   await page.locator('#clientDocument').fill('52998224725');
   await page.locator('#clientGender').selectOption('female');
@@ -134,7 +142,7 @@ test('cadastra clientes PF e PJ e aplica a qualificação completa no contrato',
   expect(saved.clients).toHaveLength(2);
   const companyId = saved.clients.find(client => client.kind === 'company').id;
 
-  await page.getByRole('tab', { name: /Novo documento/i }).click();
+  await selecionarAba(page, /Novo documento/i);
   await page.getByRole('button', { name: 'Contrato', exact: true }).click();
   await page.locator('#docLandlordClient').selectOption(representativeId);
   await page.locator('#docTenantPartyClient').selectOption(companyId);
@@ -178,15 +186,42 @@ test('migra o estado anterior sem apagar cadastros ou criar cliente indevido', a
   expect(backup).toContain('Pessoa de Migração');
 });
 
+test('quebra o menu no tablet e o recolhe em um controle expansível no celular', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  await expect(page.locator('#appMenuToggle')).toBeHidden();
+  await expect(page.locator('#appTabs')).toBeVisible();
+  const tabletMenu = await page.locator('#appTabs').evaluate(menu => ({
+    height: menu.getBoundingClientRect().height,
+    client: menu.clientWidth,
+    scroll: menu.scrollWidth
+  }));
+  expect(tabletMenu.height).toBeGreaterThan(50);
+  expect(tabletMenu.scroll).toBeLessThanOrEqual(tabletMenu.client);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const toggle = page.locator('#appMenuToggle');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#appTabs')).toBeHidden();
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#appTabs')).toBeVisible();
+  await page.getByRole('tab', { name: /Novo documento/i }).focus();
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#view-new')).toBeVisible();
+});
+
 test('mantém os controles essenciais visíveis sem rolagem horizontal', async ({ page, isMobile }) => {
-  await page.getByRole('tab', { name: /Novo documento/i }).click();
+  await selecionarAba(page, /Novo documento/i);
   if (isMobile) {
     await expect(page.locator('#previewMobileBtn')).toBeVisible();
   } else {
     await expect(page.locator('#receipt')).toBeVisible();
   }
 
-  await expect(page.getByRole('tab', { name: /Novo documento/i })).toBeVisible();
+  await expect(isMobile ? page.locator('#appMenuToggle') : page.getByRole('tab', { name: /Novo documento/i })).toBeVisible();
   const pageWidth = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth
@@ -195,7 +230,7 @@ test('mantém os controles essenciais visíveis sem rolagem horizontal', async (
 });
 
 test('cria um dossiê local e o preserva no mesmo armazenamento da aplicação', async ({ page }) => {
-  await page.getByRole('tab', { name: /Dossiês/i }).click();
+  await selecionarAba(page, /Dossiês/i);
   await page.getByRole('button', { name: 'Novo dossiê' }).click();
   await page.locator('#dossierProperty').fill('Imóvel demonstrativo, Rua Exemplo, 100');
   await page.locator('#dossierContractCode').fill('LOC-TESTE-001');
@@ -212,7 +247,7 @@ test('cria um dossiê local e o preserva no mesmo armazenamento da aplicação',
 });
 
 test('valida, emite em lote e registra a situação no dossiê', async ({ page }) => {
-  await page.getByRole('tab', { name: /Dossiês/i }).click();
+  await selecionarAba(page, /Dossiês/i);
   await page.getByRole('button', { name: 'Novo dossiê' }).click();
   await page.locator('#dossierProperty').fill('Apartamento fictício, Rua de Teste, 20');
   await page.locator('#dossierContractCode').fill('LOC-LOTE-001');
@@ -222,7 +257,7 @@ test('valida, emite em lote e registra a situação no dossiê', async ({ page }
   await page.locator('#dossierDueDay').fill('10');
   await page.getByRole('button', { name: 'Salvar dossiê' }).click();
 
-  await page.getByRole('tab', { name: /Gestão/i }).click();
+  await selecionarAba(page, /Gestão/i);
   await page.locator('#batchDossierList input').check();
   await page.locator('#buildBatchBtn').click();
   await expect(page.locator('#batchPreview')).toContainText('R$ 950,00');
@@ -234,7 +269,7 @@ test('valida, emite em lote e registra a situação no dossiê', async ({ page }
   expect(emitted.history).toHaveLength(1);
   expect(emitted.management.audit.some(event => event.action === 'emitido em lote')).toBeTruthy();
 
-  await page.getByRole('tab', { name: /Dossiês/i }).click();
+  await selecionarAba(page, /Dossiês/i);
   await page.locator('#dossierDetail').getByText(/Recibo/).click();
   await page.locator('#managementStatusSelect').selectOption('sent');
   await page.locator('#confirmManagementStatusBtn').click();
