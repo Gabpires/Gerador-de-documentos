@@ -2,7 +2,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const KEY = 'paraibaImoveisRecibosV3';
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 const MIGRATION_BACKUP_KEY = KEY+'_antes_schema_'+SCHEMA_VERSION;
 const MAX_AMOUNT = 999999999.99;
 const PAGE_SIZE = 50;
@@ -30,6 +30,7 @@ let toastTimer;
 let lastModalTrigger = null;
 let currentView = 'new';
 let editingContactId = '';
+let editingClientId = '';
 let currentDocumentType='receipt';
 let activeGenericRecord=null;
 let editingGenericDraftId='';
@@ -47,6 +48,42 @@ function normalizarCadastros(lista){
     const id=idContato(cadastro);
     unicos.set(id,{...cadastro,id});
   });
+  return [...unicos.values()];
+}
+function idCliente(c){
+  const base=(c.kind==='company'?'pj':'pf')+'|'+String(c.document||'').replace(/\D/g,'');
+  let h=2166136261;
+  for(let i=0;i<base.length;i++){h^=base.charCodeAt(i);h=Math.imul(h,16777619);}
+  return 'cli-'+(h>>>0).toString(36);
+}
+function normalizarCliente(c){
+  if(!c||typeof c!=='object')return null;
+  const kind=c.kind==='company'||c.type==='company'||c.tipo==='juridica'?'company':'individual';
+  const document=mascaraDocumento(c.document||c.cnpj||c.cpf||c.documento||'');
+  const client={
+    id:String(c.id||''),kind,name:String(c.name||c.nome||c.tenant||c.razaoSocial||'').trim().slice(0,200),document,
+    gender:['female','male','unspecified'].includes(c.gender)?c.gender:'unspecified',
+    nationality:String(c.nationality||c.nacionalidade||'').trim().slice(0,100),
+    profession:String(c.profession||c.profissao||'').trim().slice(0,160),
+    maritalStatus:String(c.maritalStatus||c.estadoCivil||'').trim().slice(0,80),
+    rg:String(c.rg||c.identity||'').trim().slice(0,80),
+    rgIssuer:String(c.rgIssuer||c.orgaoEmissor||'').trim().slice(0,80),
+    birthDate:dataValida(String(c.birthDate||c.dataNascimento||''))?String(c.birthDate||c.dataNascimento):'',
+    address:String(c.address||c.endereco||'').trim().slice(0,1500),
+    companyRegistration:String(c.companyRegistration||c.registroEmpresa||'').trim().slice(0,1000),
+    representativeId:String(c.representativeId||c.representanteId||'').trim().slice(0,120),
+    representativeRole:String(c.representativeRole||c.qualidadeRepresentante||'').trim().slice(0,160),
+    active:c.active!==false,updatedAt:typeof c.updatedAt==='string'?c.updatedAt:''
+  };
+  if(!client.name||!documentoValido(document)||!client.address)return null;
+  if(kind==='individual'&&String(document).replace(/\D/g,'').length!==11)return null;
+  if(kind==='company'&&String(document).replace(/\D/g,'').length!==14)return null;
+  client.id=client.id||idCliente(client);
+  return client;
+}
+function normalizarClientes(lista){
+  const unicos=new Map();
+  (Array.isArray(lista)?lista:[]).forEach(item=>{const client=normalizarCliente(item);if(client)unicos.set(idCliente(client),{...client,id:client.id||idCliente(client)});});
   return [...unicos.values()];
 }
 function gerarIdInstalacao(){
@@ -100,7 +137,7 @@ function normalizarModelo(t){if(!t||typeof t!=='object'||!GENERIC_TYPES.includes
 function normalizarModelos(lista){return (Array.isArray(lista)?lista:[]).map(normalizarModelo).filter(Boolean).slice(0,500);}
 function lerEstado(){
   const raw=localStorage.getItem(KEY);
-  if(!raw) return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,management:{},meta:metaNormalizada({})};
+  if(!raw) return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],clients:[],draft:null,management:{},meta:metaNormalizada({})};
   try{
     const s=JSON.parse(raw);
     if(s && typeof s==='object'){
@@ -112,7 +149,7 @@ function lerEstado(){
       documentCounters:s.documentCounters&&typeof s.documentCounters==='object'?s.documentCounters:{},
       documents:(Array.isArray(s.documents)?s.documents:[]).map(r=>normalizarDocumentoGenerico(r)).filter(Boolean),
       draftDocuments:(Array.isArray(s.draftDocuments)?s.draftDocuments:[]).map(r=>normalizarDocumentoGenerico(r,{draft:true})).filter(Boolean),
-      templates:normalizarModelos(s.templates),contacts:normalizarCadastros(s.contacts),draft:normalizarRascunho(s.draft),
+      templates:normalizarModelos(s.templates),contacts:normalizarCadastros(s.contacts),clients:normalizarClientes(s.clients),draft:normalizarRascunho(s.draft),
       management:s.management&&typeof s.management==='object'?s.management:{},
       meta:metaNormalizada(s.meta)
       };
@@ -121,7 +158,7 @@ function lerEstado(){
   }catch(e){
     recoveryRaw=raw;storageCorrupted=true;
   }
-  return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,management:{},meta:metaNormalizada({})};
+  return {counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],clients:[],draft:null,management:{},meta:metaNormalizada({})};
 }
 function persistir(next){
   if(storageCorrupted){toast('Primeiro baixe os dados para recuperação ou confirme o início de um histórico vazio.',true);return false;}
@@ -134,6 +171,7 @@ function persistir(next){
       draftDocuments:Array.isArray(next.draftDocuments)?next.draftDocuments:[],
       templates:Array.isArray(next.templates)?next.templates:[],
       contacts:Array.isArray(next.contacts)?next.contacts:[],
+      clients:Array.isArray(next.clients)?next.clients:[],
       draft:next.draft===undefined?normalizarRascunho(state&&state.draft):normalizarRascunho(next.draft),
       management:next.management&&typeof next.management==='object'?next.management:(state&&state.management&&typeof state.management==='object'?state.management:{}),
       meta:metaNormalizada(next.meta||state.meta)
@@ -367,7 +405,7 @@ function baixarDadosRecuperacao(){
 function iniciarHistoricoVazio(){
   if(!storageCorrupted||!confirm('Isso substituirá os dados locais corrompidos por um histórico vazio. Confirma?'))return;
   localStorage.removeItem(KEY);storageCorrupted=false;recoveryRaw='';
-  state={counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],draft:null,management:{},meta:metaNormalizada({})};
+  state={counters:{},documentCounters:{},history:[],documents:[],draftDocuments:[],templates:[],contacts:[],clients:[],draft:null,management:{},meta:metaNormalizada({})};
   persistir(state);activeRecord=null;draftDirty=false;historyPage=1;
   limpar();renderHistorico();atualizar();toast('Novo histórico iniciado.');
 }
@@ -427,7 +465,7 @@ function ajustarAlturaMobile(){
     const shell=$('documentPageShell'),doc=$('documentPreview');if(!shell||!doc)return;const baseWidth=doc.offsetWidth||794,baseHeight=Math.max(doc.scrollHeight||1123,1123),scale=Math.min(1,available/baseWidth);doc.style.setProperty('--document-preview-scale',String(scale));shell.style.width=Math.ceil(baseWidth*scale)+'px';shell.style.height=Math.ceil(baseHeight*scale)+'px';
   }
 }
-function atualizarVisaoSeguranca(){$('safetyReceiptsCount').textContent=String(state.history.length);$('safetyDocumentsCount').textContent=String(state.documents.length);$('safetyDraftsCount').textContent=String(state.draftDocuments.length+(state.draft?1:0));$('safetyTemplatesCount').textContent=String(state.templates.length);$('safetyContactsCount').textContent=String(state.contacts.length);$('safetySchemaVersion').textContent=String(SCHEMA_VERSION);$('safetyLastBackup').textContent=state.meta.lastBackupAt?dataHora(state.meta.lastBackupAt):'Não registrado';}
+function atualizarVisaoSeguranca(){$('safetyReceiptsCount').textContent=String(state.history.length);$('safetyDocumentsCount').textContent=String(state.documents.length);$('safetyDraftsCount').textContent=String(state.draftDocuments.length+(state.draft?1:0));$('safetyTemplatesCount').textContent=String(state.templates.length);$('safetyContactsCount').textContent=String(state.contacts.length);$('safetyClientsCount').textContent=String(state.clients.length);$('safetySchemaVersion').textContent=String(SCHEMA_VERSION);$('safetyLastBackup').textContent=state.meta.lastBackupAt?dataHora(state.meta.lastBackupAt):'Não registrado';}
 function conteudoCabeEmUmaPagina(){
   const limiteA4=(297/25.4)*96;
   return $('receipt').scrollHeight<=limiteA4+4;
@@ -442,7 +480,7 @@ function ativarView(nome,{focar=false}={}){
   const tab=$('tab-'+nome),panel=$('view-'+nome);if(!tab||!panel)return;currentView=nome;
   document.querySelectorAll('.app-tabs [role="tab"]').forEach(item=>{const ativo=item===tab;item.setAttribute('aria-selected',ativo?'true':'false');item.tabIndex=ativo?0:-1;});
   document.querySelectorAll('.view-panel').forEach(item=>{const ativo=item===panel;item.hidden=!ativo;item.classList.toggle('is-active',ativo);});fecharPreview();
-  if(nome==='history')renderHistorico();if(nome==='contacts')renderGerenciadorCadastros();if(nome==='templates')renderModelos();if(nome==='safety'){atualizarBackupStatus();atualizarVisaoSeguranca();}if(nome==='new')setTimeout(ajustarAlturaMobile,0);if(focar)tab.focus();window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  if(nome==='history')renderHistorico();if(nome==='contacts')renderGerenciadorCadastros();if(nome==='clients')renderGerenciadorClientes();if(nome==='templates')renderModelos();if(nome==='safety'){atualizarBackupStatus();atualizarVisaoSeguranca();}if(nome==='new')setTimeout(ajustarAlturaMobile,0);if(focar)tab.focus();window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
 }
 function abrirPreview(){document.body.classList.add('preview-open');$('previewMobileBtn').setAttribute('aria-expanded','true');setTimeout(()=>{ajustarAlturaMobile();$(currentDocumentType==='receipt'?'previewCloseBtn':'genericPreviewCloseBtn').focus();},0);}
 function fecharPreview(){const aberta=document.body.classList.contains('preview-open');document.body.classList.remove('preview-open');$('previewMobileBtn').setAttribute('aria-expanded','false');if(aberta)setTimeout(ajustarAlturaMobile,0);}
@@ -551,6 +589,80 @@ function excluirCadastro(){
   if(!persistir({...state,contacts})) return;
   renderCadastros();toast('Cadastro inativado e preservado no histórico.');
 }
+function nomeCliente(client){return String(client&&client.name||'').trim();}
+function descricaoCliente(client){return (client.kind==='company'?'Pessoa jurídica':'Pessoa física')+' · '+tipoDocumento(client.document)+' '+client.document;}
+function flexaoCliente(client){return client.gender==='female'?{born:'nascida',holder:'portadora',registered:'inscrita',resident:'residente e domiciliada'}:client.gender==='male'?{born:'nascido',holder:'portador',registered:'inscrito',resident:'residente e domiciliado'}:{born:'nascido(a)',holder:'portador(a)',registered:'inscrito(a)',resident:'residente e domiciliado(a)'};}
+function qualificarCliente(client,{nested=false}={}){
+  if(!client)return '';
+  if(client.kind==='company'){
+    const registration=client.companyRegistration?', '+client.companyRegistration:'';
+    const representative=state.clients.find(item=>item.id===client.representativeId&&item.kind==='individual');
+    const representation=representative?', neste ato representada por sua '+(client.representativeRole||'representante legal')+': '+qualificarCliente(representative,{nested:true}).replace(/\.$/,''):'';
+    return 'A empresa '+nomeCliente(client).toUpperCase()+', pessoa jurídica de direito privado, inscrita no CNPJ sob nº '+client.document+', com sede em '+client.address+registration+representation+'.';
+  }
+  const f=flexaoCliente(client),attributes=[client.nationality,client.profession,client.maritalStatus].filter(Boolean);
+  const identity=client.rg?f.holder+' da cédula de identidade RG nº '+client.rg+(client.rgIssuer?' - '+client.rgIssuer:''):'';
+  const birth=client.birthDate?f.born+' em '+dataLonga(client.birthDate):'';
+  const details=[...attributes,birth,identity,f.registered+' no CPF/MF sob nº '+client.document,f.resident+' à '+client.address].filter(Boolean);
+  return nomeCliente(client).toUpperCase()+(details.length?', '+details.join(', '):'')+'.';
+}
+function atualizarCamposCliente(){
+  const company=$('clientType').value==='company';
+  document.querySelectorAll('[data-client-kind="individual"]').forEach(el=>el.hidden=company);
+  document.querySelectorAll('[data-client-kind="company"]').forEach(el=>el.hidden=!company);
+  $('clientNameLabel').firstChild.nodeValue=(company?'Razão social ':'Nome completo ');
+  $('clientDocumentLabel').firstChild.nodeValue=(company?'CNPJ ':'CPF ');
+  const select=$('clientRepresentativeId'),current=select.value;
+  select.replaceChildren(new Option('Sem representante cadastrado', ''));
+  state.clients.filter(client=>client.active!==false&&client.kind==='individual').sort((a,b)=>nomeCliente(a).localeCompare(nomeCliente(b),'pt-BR')).forEach(client=>select.add(new Option(nomeCliente(client)+' — '+client.document,client.id)));
+  select.value=state.clients.some(client=>client.id===current&&client.kind==='individual')?current:'';
+}
+function limparCliente(){
+  editingClientId='';$('clientForm').reset();$('clientType').value='individual';$('clientNationality').value='Brasileiro(a)';$('clientGender').value='unspecified';$('clientFormError').textContent='';$('clientSaveBtn').textContent='Salvar cliente';atualizarCamposCliente();$('clientName').focus();
+}
+function dadosClienteFormulario(){return {id:editingClientId,kind:$('clientType').value,name:$('clientName').value,document:$('clientDocument').value,gender:$('clientGender').value,nationality:$('clientNationality').value,profession:$('clientProfession').value,maritalStatus:$('clientMaritalStatus').value,rg:$('clientRg').value,rgIssuer:$('clientRgIssuer').value,birthDate:$('clientBirthDate').value,address:$('clientAddress').value,companyRegistration:$('clientCompanyRegistration').value,representativeId:$('clientRepresentativeId').value,representativeRole:$('clientRepresentativeRole').value,active:true,updatedAt:new Date().toISOString()};}
+function salvarCliente(event){
+  event.preventDefault();
+  const source=dadosClienteFormulario(),documentDigits=String(source.document).replace(/\D/g,'');
+  const client=normalizarCliente(source);
+  let error='';
+  if(!String(source.name).trim())error='Informe o nome completo ou a razão social.';
+  else if(!documentoValido(source.document)||(source.kind==='individual'&&documentDigits.length!==11)||(source.kind==='company'&&documentDigits.length!==14))error='Informe um '+(source.kind==='company'?'CNPJ':'CPF')+' válido.';
+  else if(!String(source.address).trim())error='Informe o endereço completo.';
+  if(error||!client){$('clientFormError').textContent=error||'Revise os dados do cliente.';return;}
+  const existing=state.clients.find(item=>item.id===editingClientId||String(item.document).replace(/\D/g,'')===documentDigits);
+  const saved={...client,id:existing?existing.id:client.id,active:existing?existing.active!==false:true};
+  const clients=existing?state.clients.map(item=>item.id===existing.id?saved:item):[...state.clients,saved];
+  if(!persistir({...state,clients}))return;
+  editingClientId=saved.id;$('clientFormError').textContent='';$('clientSaveBtn').textContent='Salvar alterações';renderGerenciadorClientes();atualizarClientesContrato();atualizarVisaoSeguranca();toast('Cliente '+nomeCliente(saved)+' salvo.');
+}
+function editarCliente(id){
+  const client=state.clients.find(item=>item.id===id);if(!client)return;
+  editingClientId=client.id;$('clientType').value=client.kind;$('clientName').value=client.name;$('clientDocument').value=client.document;$('clientGender').value=client.gender;$('clientNationality').value=client.nationality;$('clientProfession').value=client.profession;$('clientMaritalStatus').value=client.maritalStatus;$('clientRg').value=client.rg;$('clientRgIssuer').value=client.rgIssuer;$('clientBirthDate').value=client.birthDate;$('clientAddress').value=client.address;$('clientCompanyRegistration').value=client.companyRegistration;$('clientRepresentativeRole').value=client.representativeRole;atualizarCamposCliente();$('clientRepresentativeId').value=client.representativeId;$('clientFormError').textContent='';$('clientSaveBtn').textContent='Salvar alterações';$('clientForm').scrollIntoView({block:'start',behavior:'smooth'});$('clientName').focus();
+}
+function alternarCliente(id){
+  const client=state.clients.find(item=>item.id===id);if(!client)return;const activate=client.active===false;
+  if(!confirm((activate?'Reativar':'Inativar')+' o cliente '+nomeCliente(client)+'? Documentos já emitidos permanecerão inalterados.'))return;
+  const clients=state.clients.map(item=>item.id===id?{...item,active:activate,updatedAt:new Date().toISOString()}:item);
+  if(!persistir({...state,clients}))return;renderGerenciadorClientes();atualizarClientesContrato();atualizarVisaoSeguranca();toast('Cliente '+(activate?'reativado.':'inativado e preservado.'));
+}
+function clientesFiltrados(){
+  const search=normalizarTexto($('clientsSearch').value),status=$('clientsStatus').value;
+  return state.clients.filter(client=>(status==='all'||(status==='active'&&client.active!==false)||(status==='inactive'&&client.active===false))&&(!search||normalizarTexto([client.name,client.document,client.address,client.profession,client.companyRegistration].join(' ')).includes(search))).sort((a,b)=>nomeCliente(a).localeCompare(nomeCliente(b),'pt-BR'));
+}
+function renderGerenciadorClientes(){
+  const box=$('clientsList');if(!box)return;const clients=clientesFiltrados(),active=state.clients.filter(client=>client.active!==false).length;
+  $('clientsSummary').innerHTML='<strong>'+clients.length+'</strong> exibido(s) · <strong>'+active+'</strong> ativo(s) · <strong>'+(state.clients.length-active)+'</strong> inativo(s)';box.replaceChildren();
+  if(!clients.length){const empty=document.createElement('div');empty.className='empty-state';empty.textContent=state.clients.length?'Nenhum cliente corresponde aos filtros.':'Nenhum cliente salvo. Cadastre pessoas físicas ou jurídicas para usar nos contratos.';box.appendChild(empty);return;}
+  clients.forEach(client=>{const card=document.createElement('article');card.className='contact-card'+(client.active===false?' is-inactive':'');const head=document.createElement('div');head.className='contact-card-head';const title=document.createElement('div'),name=document.createElement('h3'),documentText=document.createElement('p'),badge=document.createElement('span');name.textContent=nomeCliente(client);documentText.className='document';documentText.textContent=descricaoCliente(client);title.append(name,documentText);badge.className='status-badge'+(client.active===false?' canceled':'');badge.textContent=client.active===false?'Inativo':'Ativo';head.append(title,badge);const address=document.createElement('div');address.className='contact-property';address.textContent=client.address;const meta=document.createElement('div');meta.className='contact-meta';const info=document.createElement('span');info.textContent=client.kind==='company'?(client.representativeId?'Representante cadastrado: '+(state.clients.find(item=>item.id===client.representativeId)?.name||'não localizado'):'Sem representante cadastrado'):[client.nationality,client.profession,client.maritalStatus].filter(Boolean).join(' · ')||'Qualificação complementar não informada';meta.append(info);const actions=document.createElement('div');actions.className='contact-actions';actions.append(botaoHistorico('Editar',()=>editarCliente(client.id)),botaoHistorico(client.active===false?'Reativar':'Inativar',()=>alternarCliente(client.id),client.active===false?'':'danger'));card.append(head,address,meta,actions);box.appendChild(card);});
+}
+function atualizarClientesContrato(){
+  document.querySelectorAll('[data-client-role]').forEach(select=>{const current=select.value;select.replaceChildren(new Option('Selecionar cliente cadastrado...', ''));state.clients.filter(client=>client.active!==false).sort((a,b)=>nomeCliente(a).localeCompare(nomeCliente(b),'pt-BR')).forEach(client=>select.add(new Option(nomeCliente(client)+' — '+client.document,client.id)));select.value=state.clients.some(client=>client.active!==false&&client.id===current)?current:'';});
+}
+function aplicarClienteContrato(event){
+  const select=event.currentTarget,client=state.clients.find(item=>item.id===select.value&&item.active!==false),role=select.dataset.clientRole;if(!client||!role)return;
+  const name=$(role),document=$(role+'Document'),qualification=$(role+'Qualification');if(name)name.value=client.name;if(document)document.value=client.document;if(qualification)qualification.value=qualificarCliente(client);genericDirty=true;atualizarDocumentoGenerico();toast('Qualificação de '+nomeCliente(client)+' aplicada à parte do contrato.');
+}
 function preencherFormulario(r){
   $('amount').value=valorCampo(r.amount);
   $('tenant').value=r.tenant||'';
@@ -606,7 +718,7 @@ function dadosDocumentoGenerico(){const fields=coletarCamposGenericos(),date=fie
 function limparErrosGenericos(){genericErrorIds.forEach(id=>{const err=$(id+'Error');if(err)err.textContent='';const input=$(id);if(input)input.setAttribute('aria-invalid','false');});}
 function validarDocumentoGenerico(d){const f=d.fields,e={};if(String(f.docTitle||'').trim().length<3)e.docTitle='Informe um título com pelo menos 3 caracteres.';if(!dataValida(f.docDate))e.docDate='Informe uma data válida.';if(String(f.docCity||'').trim().length<3)e.docCity='Informe a cidade e o estado.';if(d.type==='declaration'){if(String(f.docDeclarant||'').trim().length<3)e.docDeclarant='Informe o nome do declarante.';if(!documentoValido(f.docDeclarantDocument))e.docDeclarantDocument='Informe um CPF ou CNPJ válido.';if(String(f.docSubject||'').trim().length<3)e.docSubject='Informe o assunto.';if(String(f.docBody||'').trim().length<20)e.docBody='O texto deve ter pelo menos 20 caracteres.';}if(d.type==='term'){if(String(f.docPartyOne||'').trim().length<3)e.docPartyOne='Informe a primeira parte.';if(String(f.docProperty||'').trim().length<3)e.docProperty='Informe o imóvel ou objeto.';if(String(f.docObligations||'').trim().length<10)e.docObligations='Descreva as obrigações e condições.';}if(d.type==='contract'){if(String(f.docContractProperty||'').trim().length<3)e.docContractProperty='Informe o imóvel ou objeto do contrato.';if(String(f.docCustomClauses||'').trim().length<10&&!(f.selectedClauses||[]).length)e.docCustomClauses='Adicione ao menos uma cláusula da biblioteca ou uma cláusula personalizada.';const sub=f.docContractSubtype;if(sub==='lease'&&(!String(f.docLandlord||'').trim()||!String(f.docTenantParty||'').trim()))e.docContractProperty='Informe locador e locatário antes de emitir.';if(sub==='sale'&&(!String(f.docSeller||'').trim()||!String(f.docBuyer||'').trim()))e.docContractProperty='Informe vendedor e comprador antes de emitir.';if(sub==='management'&&!String(f.docLandlord||'').trim())e.docContractProperty='Informe o proprietário antes de emitir.';}return e;}
 function mostrarErrosGenericos(erros){limparErrosGenericos();let primeiro=null;for(const [id,msg] of Object.entries(erros)){const err=$(id+'Error'),input=$(id);if(err)err.textContent=msg;if(input){input.setAttribute('aria-invalid','true');if(!primeiro)primeiro=input;}}if(primeiro){const secao=primeiro.closest('details');if(secao)secao.open=true;requestAnimationFrame(()=>{primeiro.focus();primeiro.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});});return false;}return true;}
-function atualizarCamposCondicionais(){document.querySelectorAll('.doc-type-fields').forEach(el=>el.hidden=el.dataset.docType!==currentDocumentType);const contrato=$('docContractSubtype').value||'lease';document.querySelectorAll('.contract-role').forEach(el=>el.hidden=!String(el.dataset.contractTypes||'').split(/\s+/).includes(contrato));const termo=$('docTermSubtype').value||'general';document.querySelectorAll('.term-conditional').forEach(el=>el.hidden=el.dataset.termSubtype!==termo);if(!activeGenericRecord&&!String($('docTitle').value||'').trim())$('docTitle').value=tituloPadraoDocumento(currentDocumentType);atualizarOpcoesModelos();}
+function atualizarCamposCondicionais(){document.querySelectorAll('.doc-type-fields').forEach(el=>el.hidden=el.dataset.docType!==currentDocumentType);const contrato=$('docContractSubtype').value||'lease';document.querySelectorAll('.contract-role').forEach(el=>el.hidden=!String(el.dataset.contractTypes||'').split(/\s+/).includes(contrato));const termo=$('docTermSubtype').value||'general';document.querySelectorAll('.term-conditional').forEach(el=>el.hidden=el.dataset.termSubtype!==termo);if(!activeGenericRecord&&!String($('docTitle').value||'').trim())$('docTitle').value=tituloPadraoDocumento(currentDocumentType);atualizarOpcoesModelos();if(currentDocumentType==='contract')atualizarClientesContrato();}
 function atualizarCadastrosDocumento(){const sel=$('docQuickContact'),atual=sel.value;sel.replaceChildren();const vazio=document.createElement('option');vazio.value='';vazio.textContent='Selecionar pessoa e imóvel...';sel.appendChild(vazio);state.contacts.filter(c=>c.active!==false).sort((a,b)=>String(a.tenant).localeCompare(String(b.tenant),'pt-BR')).forEach(c=>{const op=document.createElement('option');op.value=c.id;op.textContent=c.tenant+' — '+c.property;sel.appendChild(op);});sel.value=state.contacts.some(c=>c.active!==false&&c.id===atual)?atual:'';}
 function aplicarCadastroDocumento(){const c=state.contacts.find(x=>x.id===$('docQuickContact').value&&x.active!==false);if(!c)return;if(currentDocumentType==='declaration'){$('docDeclarant').value=c.tenant;$('docDeclarantDocument').value=c.cpf;}else if(currentDocumentType==='term'){$('docPartyOne').value=c.tenant;$('docPartyOneDocument').value=c.cpf;$('docProperty').value=c.property;}else if(currentDocumentType==='contract'){const sub=$('docContractSubtype').value;if(sub==='sale'){$('docBuyer').value=c.tenant;$('docBuyerDocument').value=c.cpf;}else{$('docTenantParty').value=c.tenant;$('docTenantPartyDocument').value=c.cpf;}$('docContractProperty').value=c.property;}genericDirty=true;atualizarDocumentoGenerico();toast('Cadastro ativo aplicado ao documento.');}
 function atualizarOpcoesModelos(){const sel=$('docTemplate'),atual=sel.value;sel.replaceChildren();const padrao=document.createElement('option');padrao.value='';padrao.textContent='Modelo padrão';sel.appendChild(padrao);state.templates.filter(t=>t.active!==false&&t.type===currentDocumentType).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).forEach(t=>{const op=document.createElement('option');op.value=t.id;op.textContent=t.name;sel.appendChild(op);});sel.value=state.templates.some(t=>t.id===atual&&t.active!==false&&t.type===currentDocumentType)?atual:'';}
@@ -617,11 +729,12 @@ function adicionarTexto(container,texto,classe=''){if(!String(texto||'').trim())
 function adicionarBloco(container,linhas){const bloco=document.createElement('div');bloco.className='data-block';linhas.filter(x=>x&&String(x).trim()).forEach(x=>adicionarTexto(bloco,x));if(bloco.children.length)container.appendChild(bloco);}
 function adicionarTituloSecao(container,texto){const h=document.createElement('h2');h.textContent=texto;container.appendChild(h);}
 function assinaturaElemento(nome,detalhe=''){const div=document.createElement('div');div.className='document-signature';const strong=document.createElement('strong');strong.textContent=nome||'Assinatura';div.appendChild(strong);if(detalhe){const span=document.createElement('span');span.textContent=detalhe;div.appendChild(span);}return div;}
+function adicionarParteContrato(container,rotulo,texto){const p=document.createElement('p');p.className='contract-party';const strong=document.createElement('strong');strong.textContent=rotulo+': ';p.append(strong,document.createTextNode(texto||'Não informado.'));container.appendChild(p);}
 function linhasClausulas(f){const selecionadas=(f.selectedClauses||[]).map(k=>CLAUSE_LIBRARY[k]).filter(Boolean),personalizadas=String(f.docCustomClauses||'').split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);return [...selecionadas,...personalizadas];}
 function atualizarDocumentoGenerico(){if(currentDocumentType==='receipt')return;const d=activeGenericRecord||dadosDocumentoGenerico(),f=d.fields,content=$('dpContent'),signatures=$('dpSignatures');content.replaceChildren();signatures.replaceChildren();$('genericNumberLabel').textContent=activeGenericRecord?d.number:numeroDocumento(currentDocumentType,f.docDate);$('genericPreviewLabel').textContent=rotuloTipo(currentDocumentType);$('dpNumber').textContent=(d.status==='draft'?'RASCUNHO · ':rotuloTipo(d.type).toUpperCase()+' Nº ')+(d.number||numeroDocumento(d.type,f.docDate));$('dpDate').textContent=(f.docCity||'Araçariguama/SP')+', '+dataLonga(f.docDate||hoje());$('dpTitle').textContent=f.docTitle||tituloPadraoDocumento(d.type);$('dpRepeatTitle').textContent=f.docTitle||rotuloTipo(d.type);const timbre=d.letterhead||f.docLetterhead||'none';$('documentLetterhead').hidden=timbre==='none';$('documentPreview').classList.toggle('has-repeat-header',timbre==='repeat');$('documentPreview').classList.toggle('has-footer',d.footerEnabled===true);$('dpFooter').hidden=!d.footerEnabled;
   if(d.type==='declaration'){if(f.docRecipient)adicionarTexto(content,'Ao(À) '+f.docRecipient+'.');adicionarBloco(content,['Declarante: '+(f.docDeclarant||'Não informado'),'Documento: '+(f.docDeclarantDocument||'Não informado'),'Assunto: '+(f.docSubject||'Não informado'),f.docPurpose?'Finalidade: '+f.docPurpose:'']);adicionarTexto(content,f.docBody||'Preencha o texto da declaração.');signatures.appendChild(assinaturaElemento(f.docDeclarant||'Declarante',f.docDeclarantDocument||''));signatures.appendChild(assinaturaElemento(f.docOperator||operadores[0],'S.A. Paraíba Imóveis J.R. Ltda.'));}
   if(d.type==='term'){adicionarBloco(content,['Primeira parte: '+(f.docPartyOne||'Não informada')+(f.docPartyOneDocument?' — '+f.docPartyOneDocument:''),f.docPartyTwo?'Segunda parte: '+f.docPartyTwo+(f.docPartyTwoDocument?' — '+f.docPartyTwoDocument:''):'','Imóvel/objeto: '+(f.docProperty||'Não informado'),f.docRelatedContract?'Documento relacionado: '+f.docRelatedContract:'',f.docEffectiveDate?'Data de efeito: '+dataLonga(f.docEffectiveDate):'',f.docDeadline?'Prazo: '+f.docDeadline:'',f.docKeysQuantity?'Chaves: '+f.docKeysQuantity:'']);if(f.docTermSubtype==='rectification'){adicionarTituloSecao(content,'Retificação');adicionarTexto(content,'Onde consta: '+(f.docCorrectionFrom||'—'));adicionarTexto(content,'Passa a constar: '+(f.docCorrectionTo||'—'));adicionarTexto(content,'Permanecem inalteradas e ratificadas as demais disposições do documento original.');}adicionarTituloSecao(content,'Obrigações e condições');adicionarTexto(content,f.docObligations||'Preencha as obrigações e condições.');if(f.docObservations){adicionarTituloSecao(content,'Observações');adicionarTexto(content,f.docObservations);}signatures.appendChild(assinaturaElemento(f.docPartyOne||'Primeira parte',f.docPartyOneDocument||''));if(f.docPartyTwo)signatures.appendChild(assinaturaElemento(f.docPartyTwo,f.docPartyTwoDocument||''));String(f.docSignatures||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>signatures.appendChild(assinaturaElemento(x)));signatures.appendChild(assinaturaElemento(f.docOperator||operadores[0],'Responsável pela emissão'));}
-  if(d.type==='contract'){const sub=f.docContractSubtype||'lease';if(sub==='lease')adicionarBloco(content,['LOCADOR(A): '+(f.docLandlord||'Não informado')+(f.docLandlordDocument?' — '+f.docLandlordDocument:''),'LOCATÁRIO(A): '+(f.docTenantParty||'Não informado')+(f.docTenantPartyDocument?' — '+f.docTenantPartyDocument:''),f.docGuarantors?'FIADOR(ES): '+f.docGuarantors:'']);else if(sub==='sale')adicionarBloco(content,['VENDEDOR(A): '+(f.docSeller||'Não informado')+(f.docSellerDocument?' — '+f.docSellerDocument:''),'COMPRADOR(A): '+(f.docBuyer||'Não informado')+(f.docBuyerDocument?' — '+f.docBuyerDocument:'')]);else adicionarBloco(content,['PROPRIETÁRIO(A): '+(f.docLandlord||'Não informado')+(f.docLandlordDocument?' — '+f.docLandlordDocument:''),'ADMINISTRADORA: S.A. Paraíba Imóveis J.R. Ltda. — CNPJ 09.534.406/0001-29']);adicionarTituloSecao(content,'Objeto');adicionarTexto(content,f.docContractProperty||'Preencha o imóvel ou objeto do contrato.');adicionarBloco(content,[f.docContractPurpose?'Finalidade: '+f.docContractPurpose:'',f.docStartDate?'Início: '+dataLonga(f.docStartDate):'',f.docEndDate?'Término: '+dataLonga(f.docEndDate):'',f.docContractValue?'Valor: R$ '+f.docContractValue:'',f.docContractDueDay?'Vencimento: dia '+f.docContractDueDay:'',f.docAdjustment?'Reajuste: '+f.docAdjustment:'',f.docGuarantee?'Garantia: '+f.docGuarantee:'']);adicionarTituloSecao(content,'Cláusulas e condições');const ol=document.createElement('ol');linhasClausulas(f).forEach(texto=>{const li=document.createElement('li');li.textContent=texto;ol.appendChild(li);});if(!ol.children.length){const li=document.createElement('li');li.textContent='Adicione as cláusulas do contrato.';ol.appendChild(li);}content.appendChild(ol);if(sub==='lease'){signatures.appendChild(assinaturaElemento(f.docLandlord||'Locador(a)',f.docLandlordDocument||''));signatures.appendChild(assinaturaElemento(f.docTenantParty||'Locatário(a)',f.docTenantPartyDocument||''));}else if(sub==='sale'){signatures.appendChild(assinaturaElemento(f.docSeller||'Vendedor(a)',f.docSellerDocument||''));signatures.appendChild(assinaturaElemento(f.docBuyer||'Comprador(a)',f.docBuyerDocument||''));}else{signatures.appendChild(assinaturaElemento(f.docLandlord||'Proprietário(a)',f.docLandlordDocument||''));signatures.appendChild(assinaturaElemento(f.docOperator||operadores[0],'S.A. Paraíba Imóveis J.R. Ltda.'));}if(f.docWitnessOne)signatures.appendChild(assinaturaElemento(f.docWitnessOne,'Testemunha · '+(f.docWitnessOneDocument||'')));if(f.docWitnessTwo)signatures.appendChild(assinaturaElemento(f.docWitnessTwo,'Testemunha · '+(f.docWitnessTwoDocument||'')));}
+  if(d.type==='contract'){const sub=f.docContractSubtype||'lease',party=(key)=>f[key+'Qualification']||((f[key]||'Não informado')+(f[key+'Document']?' — '+f[key+'Document']:''));if(sub==='lease'){adicionarParteContrato(content,'LOCADOR(A)',party('docLandlord'));adicionarParteContrato(content,'LOCATÁRIO(A)',party('docTenantParty'));if(f.docGuarantors)adicionarParteContrato(content,'FIADOR(ES)',f.docGuarantors);}else if(sub==='sale'){adicionarParteContrato(content,'VENDEDOR(A)',party('docSeller'));adicionarParteContrato(content,'COMPRADOR(A)',party('docBuyer'));}else{adicionarParteContrato(content,'PROPRIETÁRIO(A)',party('docLandlord'));adicionarParteContrato(content,'ADMINISTRADORA','S.A. Paraíba Imóveis J.R. Ltda. — CNPJ 09.534.406/0001-29');}adicionarTituloSecao(content,'Objeto');adicionarTexto(content,f.docContractProperty||'Preencha o imóvel ou objeto do contrato.');adicionarBloco(content,[f.docContractPurpose?'Finalidade: '+f.docContractPurpose:'',f.docStartDate?'Início: '+dataLonga(f.docStartDate):'',f.docEndDate?'Término: '+dataLonga(f.docEndDate):'',f.docContractValue?'Valor: R$ '+f.docContractValue:'',f.docContractDueDay?'Vencimento: dia '+f.docContractDueDay:'',f.docAdjustment?'Reajuste: '+f.docAdjustment:'',f.docGuarantee?'Garantia: '+f.docGuarantee:'']);adicionarTituloSecao(content,'Cláusulas e condições');const ol=document.createElement('ol');linhasClausulas(f).forEach(texto=>{const li=document.createElement('li');li.textContent=texto;ol.appendChild(li);});if(!ol.children.length){const li=document.createElement('li');li.textContent='Adicione as cláusulas do contrato.';ol.appendChild(li);}content.appendChild(ol);if(sub==='lease'){signatures.appendChild(assinaturaElemento(f.docLandlord||'Locador(a)',f.docLandlordDocument||''));signatures.appendChild(assinaturaElemento(f.docTenantParty||'Locatário(a)',f.docTenantPartyDocument||''));}else if(sub==='sale'){signatures.appendChild(assinaturaElemento(f.docSeller||'Vendedor(a)',f.docSellerDocument||''));signatures.appendChild(assinaturaElemento(f.docBuyer||'Comprador(a)',f.docBuyerDocument||''));}else{signatures.appendChild(assinaturaElemento(f.docLandlord||'Proprietário(a)',f.docLandlordDocument||''));signatures.appendChild(assinaturaElemento(f.docOperator||operadores[0],'S.A. Paraíba Imóveis J.R. Ltda.'));}if(f.docWitnessOne)signatures.appendChild(assinaturaElemento(f.docWitnessOne,'Testemunha · '+(f.docWitnessOneDocument||'')));if(f.docWitnessTwo)signatures.appendChild(assinaturaElemento(f.docWitnessTwo,'Testemunha · '+(f.docWitnessTwoDocument||'')));}
   const status=statusDocumento(d);$('documentWatermark').textContent=status==='draft'?'RASCUNHO':status==='canceled'?'CANCELADO':status==='archived'?'ARQUIVADO':'';$('documentWatermark').hidden=status==='issued';$('genericStatus').className='generic-status '+status;$('genericStatus').textContent=status==='draft'?(editingGenericDraftId?'Rascunho salvo — continue editando ou emita quando estiver pronto.':'Rascunho novo — '+(timbre==='none'?'sem timbre':'com timbre')+'.'):rotuloTipo(d.type)+' '+d.number+' — '+rotuloStatus(status).toLowerCase()+'.';$('genericPrintBtn').disabled=!activeGenericRecord;$('genericIssueBtn').disabled=!!activeGenericRecord;$('genericSaveDraftBtn').disabled=!!activeGenericRecord;$('genericSaveTemplateBtn').disabled=!!activeGenericRecord;$('genericDuplicateBtn').hidden=!activeGenericRecord;requestAnimationFrame(()=>{const paginas=Math.max(1,Math.ceil(($('documentPreview').scrollHeight||1123)/1123));$('genericPageWarning').textContent=paginas>1?'Documento multipágina: aproximadamente '+paginas+' páginas A4. As assinaturas e cláusulas evitam quebras internas sempre que possível.':'Conteúdo estimado em uma página A4.';ajustarAlturaMobile();});
 }
 function travarDocumentoGenerico(travado){camposGenericosElementos().forEach(el=>el.disabled=travado);document.querySelectorAll('[data-clause]').forEach(el=>el.disabled=travado);$('docQuickContact').disabled=travado;$('docTemplate').disabled=travado;}
@@ -927,13 +1040,15 @@ function normalizarBackup(payload){
   }
   const contatosOriginais=Array.isArray(fonte.contacts)?fonte.contacts:[];
   const contacts=normalizarCadastros(contatosOriginais);
+  const clientesOriginais=Array.isArray(fonte.clients)?fonte.clients:[];
+  const clients=normalizarClientes(clientesOriginais);
   const documentCounters=fonte.documentCounters&&typeof fonte.documentCounters==='object'?fonte.documentCounters:{};
   const documents=(Array.isArray(fonte.documents)?fonte.documents:[]).map(r=>normalizarDocumentoGenerico(r)).filter(Boolean);
   const draftDocuments=(Array.isArray(fonte.draftDocuments)?fonte.draftDocuments:[]).map(r=>normalizarDocumentoGenerico(r,{draft:true})).filter(Boolean);
   const templates=normalizarModelos(fonte.templates);
   const docNumbers=new Set();for(const d of documents){if(!d.number||docNumbers.has(d.number))throw new Error('Há documentos com numeração ausente ou repetida no backup.');if(Object.keys(validarDocumentoGenerico(d)).length)throw new Error('Há '+rotuloTipo(d.type).toLowerCase()+' com campos obrigatórios inválidos no backup.');docNumbers.add(d.number);}
-  return {counters,documentCounters,history:[...unicos.values()],documents,draftDocuments,templates,contacts,draft:normalizarRascunho(fonte.draft),management:fonte.management&&typeof fonte.management==='object'?fonte.management:{},meta:metaNormalizada(fonte.meta),
-    _importStats:{ignoredContacts:Math.max(0,contatosOriginais.length-contacts.length)}};
+  return {counters,documentCounters,history:[...unicos.values()],documents,draftDocuments,templates,contacts,clients,draft:normalizarRascunho(fonte.draft),management:fonte.management&&typeof fonte.management==='object'?fonte.management:{},meta:metaNormalizada(fonte.meta),
+    _importStats:{ignoredContacts:Math.max(0,contatosOriginais.length-contacts.length),ignoredClients:Math.max(0,clientesOriginais.length-clients.length)}};
 }
 function importarBackup(file){
   if(file.size>8*1024*1024){toast('O backup ultrapassa 8 MB.',true);return;}
@@ -955,6 +1070,8 @@ function importarBackup(file){
       const contacts=state.contacts.slice(),contactIds=new Set(contacts.map(c=>c.id));
       let novosCadastros=0;
       incoming.contacts.forEach(c=>{if(!contactIds.has(c.id)){contacts.push(c);contactIds.add(c.id);novosCadastros++;}});
+      const clients=state.clients.slice(),clientIds=new Set(clients.map(client=>client.id));let novosClientes=0;
+      incoming.clients.forEach(client=>{if(!clientIds.has(client.id)){clients.push(client);clientIds.add(client.id);novosClientes++;}});
       const documents=state.documents.slice(),documentIds=new Set(documents.map(d=>d.id)),documentNumbers=new Set(documents.map(d=>d.number));let novosDocumentos=0;
       incoming.documents.forEach(d=>{if(documentNumbers.has(d.number)&&!documents.some(x=>x.number===d.number&&JSON.stringify(x.fields)===JSON.stringify(d.fields)))throw new Error('Conflito no documento '+d.number+'. Nada foi importado.');if(!documentIds.has(d.id)&&!documentNumbers.has(d.number)){documents.push(d);documentIds.add(d.id);documentNumbers.add(d.number);novosDocumentos++;}});
       const draftDocuments=state.draftDocuments.slice(),draftIds=new Set(draftDocuments.map(d=>d.id));incoming.draftDocuments.forEach(d=>{if(!draftIds.has(d.id)){draftDocuments.push(d);draftIds.add(d.id);}});
@@ -966,13 +1083,13 @@ function importarBackup(file){
         counters[ano]=Math.max(Number(counters[ano])||1,Number(r.number.split('/')[0])+1);
       });
       const documentCounters={...state.documentCounters};for(const [chave,n] of Object.entries(incoming.documentCounters||{}))documentCounters[chave]=Math.max(Number(documentCounters[chave])||1,Number(n)||1);documents.forEach(d=>{const chave=chaveContadorDocumento(d.type,d.year),m=String(d.number).match(/-(\d+)\//);documentCounters[chave]=Math.max(Number(documentCounters[chave])||1,(m?Number(m[1]):0)+1);});
-      const ignorados=incoming._importStats.ignoredContacts;
-      const resumo=novos+' recibo(s), '+novosDocumentos+' outro(s) documento(s), '+atualizados+' cancelamento(s) atualizado(s), '+novosCadastros+' cadastro(s) novo(s)'+(ignorados?' e '+ignorados+' cadastro(s) inválido(s) ignorado(s)':'');
+      const ignorados=incoming._importStats.ignoredContacts,clientesIgnorados=incoming._importStats.ignoredClients;
+      const resumo=novos+' recibo(s), '+novosDocumentos+' outro(s) documento(s), '+atualizados+' cancelamento(s) atualizado(s), '+novosCadastros+' cadastro(s) de imóvel e '+novosClientes+' cliente(s) novo(s)'+(ignorados||clientesIgnorados?' e '+(ignorados+clientesIgnorados)+' cadastro(s) inválido(s) ignorado(s)':'');
       if(!confirm('Importar '+resumo+'? O histórico atual será preservado.')) return;
       const seguranca={...state,meta:{...state.meta,lastBackupAt:new Date().toISOString()}};
       baixarBackupEstado(seguranca,'backup-antes-importacao');
-      if(!persistir({counters,documentCounters,history,documents,draftDocuments,templates,contacts,draft:state.draft||incoming.draft,management:incoming.management&&Object.keys(incoming.management).length?incoming.management:state.management,meta:seguranca.meta})) return;
-      historyPage=1;renderCadastros();renderHistorico();renderModelos();atualizar();if(currentDocumentType!=='receipt')atualizarDocumentoGenerico();toast('Backup importado: '+resumo+'.');
+      if(!persistir({counters,documentCounters,history,documents,draftDocuments,templates,contacts,clients,draft:state.draft||incoming.draft,management:incoming.management&&Object.keys(incoming.management).length?incoming.management:state.management,meta:seguranca.meta})) return;
+      historyPage=1;renderCadastros();renderGerenciadorClientes();renderHistorico();renderModelos();atualizarClientesContrato();atualizar();if(currentDocumentType!=='receipt')atualizarDocumentoGenerico();toast('Backup importado: '+resumo+'.');
     }catch(e){toast('Não foi possível importar. '+(e.message||'Arquivo inválido.'),true);}
     finally{$('importFile').value='';}
   };
@@ -1067,6 +1184,7 @@ $('docTemplate').addEventListener('change',aplicarModeloSelecionado);
 document.querySelectorAll('[data-document-type]').forEach(btn=>btn.addEventListener('click',()=>selecionarTipoDocumento(btn.dataset.documentType)));
 camposGenericosElementos().forEach(el=>{const evento=(el.tagName==='SELECT'||el.type==='checkbox'||el.type==='date')?'change':'input';el.addEventListener(evento,()=>{genericDirty=true;const err=$(el.id+'Error');if(err)err.textContent='';el.setAttribute('aria-invalid','false');if(el.id==='docTermSubtype'||el.id==='docContractSubtype'){const atual=String($('docTitle').value||'').toUpperCase();if(!atual||atual.startsWith('TERMO')||atual.startsWith('CONTRATO'))$('docTitle').value=tituloPadraoDocumento(currentDocumentType);atualizarCamposCondicionais();}atualizarDocumentoGenerico();});});
 document.querySelectorAll('[data-clause]').forEach(el=>el.addEventListener('change',()=>{genericDirty=true;atualizarDocumentoGenerico();}));
+document.querySelectorAll('[data-client-role]').forEach(select=>select.addEventListener('change',aplicarClienteContrato));
 ['docDeclarantDocument','docPartyOneDocument','docPartyTwoDocument','docLandlordDocument','docTenantPartyDocument','docSellerDocument','docBuyerDocument','docWitnessOneDocument','docWitnessTwoDocument'].forEach(id=>$(id).addEventListener('input',e=>{e.target.value=mascaraDocumento(e.target.value);genericDirty=true;atualizarDocumentoGenerico();}));
 $('confirmIssueBtn').addEventListener('click',confirmarEmissao);
 $('cancelIssueBtn').addEventListener('click',()=>{pendingIssue=null;fecharModal('confirmModal');$('issueBtn').focus();});
@@ -1094,6 +1212,7 @@ $('historyFiltersToggle').addEventListener('click',()=>{const aberto=$('historyF
 $('historyPrevBtn').addEventListener('click',()=>{if(historyPage>1){historyPage--;renderHistorico();}});
 $('historyNextBtn').addEventListener('click',()=>{historyPage++;renderHistorico();});
 $('contactsSearch').addEventListener('input',renderGerenciadorCadastros);$('contactsStatus').addEventListener('change',renderGerenciadorCadastros);$('clearContactsFilters').addEventListener('click',()=>{$('contactsSearch').value='';$('contactsStatus').value='all';renderGerenciadorCadastros();});
+$('clientForm').addEventListener('submit',salvarCliente);$('clientType').addEventListener('change',atualizarCamposCliente);$('clientDocument').addEventListener('input',event=>{event.target.value=mascaraDocumento(event.target.value);$('clientFormError').textContent='';});$('newClientBtn').addEventListener('click',limparCliente);$('newClientBtnInline').addEventListener('click',limparCliente);$('clientsSearch').addEventListener('input',renderGerenciadorClientes);$('clientsStatus').addEventListener('change',renderGerenciadorClientes);$('clearClientsFilters').addEventListener('click',()=>{$('clientsSearch').value='';$('clientsStatus').value='all';renderGerenciadorClientes();});
 $('templatesSearch').addEventListener('input',renderModelos);$('templatesStatus').addEventListener('change',renderModelos);$('clearTemplatesFilters').addEventListener('click',()=>{$('templatesSearch').value='';$('templatesStatus').value='all';renderModelos();});$('newTemplateFromCurrentBtn').addEventListener('click',()=>{if(currentDocumentType==='receipt'){selecionarTipoDocumento('declaration',{ignorarConfirmacao:true});}salvarModeloAtual();});
 $('newContactBtn').addEventListener('click',()=>{selecionarTipoDocumento('receipt',{ignorarConfirmacao:true});if(limpar()){ativarView('new');$('tenant').focus();$('savedTenantStatus').textContent='Informe os dados e clique em “Salvar cadastro”.';}});$('previewMobileBtn').addEventListener('click',abrirPreview);$('previewCloseBtn').addEventListener('click',()=>{fecharPreview();$('previewMobileBtn').focus();});$('genericPreviewCloseBtn').addEventListener('click',()=>{fecharPreview();$('previewMobileBtn').focus();});
 document.querySelectorAll('.app-tabs [role="tab"]').forEach(tab=>{tab.addEventListener('click',()=>ativarView(tab.dataset.view));tab.addEventListener('keydown',e=>{const tabs=[...document.querySelectorAll('.app-tabs [role="tab"]')],i=tabs.indexOf(tab);let destino=-1;if(e.key==='ArrowRight')destino=(i+1)%tabs.length;else if(e.key==='ArrowLeft')destino=(i-1+tabs.length)%tabs.length;else if(e.key==='Home')destino=0;else if(e.key==='End')destino=tabs.length-1;if(destino>=0){e.preventDefault();ativarView(tabs[destino].dataset.view,{focar:true});}});});
@@ -1120,17 +1239,18 @@ window.addEventListener('storage',e=>{
     else{activeRecord=null;travar(false);}
   }
   if(!activeRecord&&!draftDirty&&state.draft)restaurarRascunho();
-  renderCadastros();renderHistorico();renderModelos();atualizar();if(currentDocumentType!=='receipt'){atualizarCadastrosDocumento();atualizarOpcoesModelos();atualizarDocumentoGenerico();}
+  renderCadastros();renderGerenciadorClientes();renderHistorico();renderModelos();atualizarClientesContrato();atualizar();if(currentDocumentType!=='receipt'){atualizarCadastrosDocumento();atualizarOpcoesModelos();atualizarDocumentoGenerico();}
 });
 if('ResizeObserver'in window){const previewObserver=new ResizeObserver(ajustarAlturaMobile);previewObserver.observe($('receipt'));previewObserver.observe($('documentPreview'));previewObserver.observe(document.querySelector('.workspace'));}
 $('receiptDate').value=hoje();
 $('reference').value=mesAtual();
 $('payment').value='Dinheiro';
 $('operator').value=state.meta.defaultOperator||operadores[0];
-$('historyType').value='all';$('historyStatus').value='all';$('historyYear').value='all';$('historyPayment').value='all';$('historySort').value='newest';$('contactsStatus').value='all';$('templatesStatus').value='all';
+$('historyType').value='all';$('historyStatus').value='all';$('historyYear').value='all';$('historyPayment').value='all';$('historySort').value='newest';$('contactsStatus').value='all';$('clientsStatus').value='all';$('templatesStatus').value='all';
 mostrarErros({});
 if(migrationBackupCreated)persistir(state);
 if(!restaurarRascunho())renderCadastros();
+atualizarCamposCliente();renderGerenciadorClientes();atualizarClientesContrato();
 const logoDocumento=document.querySelector('#receipt .logo');if(logoDocumento){const clone=logoDocumento.cloneNode(true);clone.removeAttribute('class');$('documentLogoHost').appendChild(clone);}
 limparDocumentoGenerico({preservarTipo:true});
 renderHistorico();

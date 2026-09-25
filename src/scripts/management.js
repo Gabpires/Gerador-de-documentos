@@ -51,7 +51,7 @@
     };
   }
   function emptyState() {
-    return { counters: {}, documentCounters: {}, history: [], documents: [], draftDocuments: [], templates: [], contacts: [], draft: null, management: {}, meta: { schemaVersion: 9, lastBackupAt: '', installationId: id('installation'), defaultOperator: 'Sandra Marcondes da Silva Alves' } };
+    return { counters: {}, documentCounters: {}, history: [], documents: [], draftDocuments: [], templates: [], contacts: [], clients: [], draft: null, management: {}, meta: { schemaVersion: 10, lastBackupAt: '', installationId: id('installation'), defaultOperator: 'Sandra Marcondes da Silva Alves' } };
   }
   function read() {
     try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : emptyState(); } catch { return null; }

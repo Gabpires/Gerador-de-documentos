@@ -99,6 +99,85 @@ test('emite uma declaração e preserva sua numeração', async ({ page }) => {
   await expect(page.locator('#dpNumber')).toContainText('DECL-001/2026');
 });
 
+test('cadastra clientes PF e PJ e aplica a qualificação completa no contrato', async ({ page }) => {
+  await page.getByRole('tab', { name: /Clientes/i }).click();
+  await page.locator('#clientName').fill('Marina de Exemplo');
+  await page.locator('#clientDocument').fill('52998224725');
+  await page.locator('#clientGender').selectOption('female');
+  await page.locator('#clientNationality').fill('brasileira');
+  await page.locator('#clientProfession').fill('advogada');
+  await page.locator('#clientMaritalStatus').fill('casada');
+  await page.locator('#clientBirthDate').fill('1988-04-12');
+  await page.locator('#clientRg').fill('42.123.456-7');
+  await page.locator('#clientRgIssuer').fill('SSP/SP');
+  await page.locator('#clientAddress').fill('Rua Fictícia, 100, Centro, Cidade Exemplo/SP, CEP 01000-000');
+  await page.locator('#clientForm').evaluate(form => form.requestSubmit());
+  await expect(page.locator('#clientsList')).toContainText('Marina de Exemplo');
+
+  let saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  const representativeId = saved.clients[0].id;
+
+  await page.getByRole('button', { name: 'Novo cliente', exact: true }).click();
+  await page.locator('#clientType').selectOption('company');
+  await expect(page.locator('#clientNameLabel')).toContainText('Razão social');
+  await page.locator('#clientName').fill('Controle Exemplo Sistemas Ltda.');
+  await page.locator('#clientDocument').fill('12345678000195');
+  await page.locator('#clientAddress').fill('Avenida Demonstração, 725, São Paulo/SP, CEP 02000-000');
+  await page.locator('#clientCompanyRegistration').fill('registrada na Junta Comercial sob NIRE de demonstração');
+  await page.locator('#clientRepresentativeId').selectOption(representativeId);
+  await page.locator('#clientRepresentativeRole').fill('sócia administradora');
+  await page.locator('#clientForm').evaluate(form => form.requestSubmit());
+  await expect(page.locator('#clientsList')).toContainText('Controle Exemplo Sistemas Ltda.');
+
+  saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(saved.meta.schemaVersion).toBe(10);
+  expect(saved.clients).toHaveLength(2);
+  const companyId = saved.clients.find(client => client.kind === 'company').id;
+
+  await page.getByRole('tab', { name: /Novo documento/i }).click();
+  await page.getByRole('button', { name: 'Contrato', exact: true }).click();
+  await page.locator('#docLandlordClient').selectOption(representativeId);
+  await page.locator('#docTenantPartyClient').selectOption(companyId);
+  await page.locator('#docContractProperty').fill('Apartamento demonstrativo, Rua de Teste, 20');
+  await page.locator('#docCustomClauses').fill('Cláusula demonstrativa para teste automatizado.');
+
+  await expect(page.locator('#dpContent')).toContainText('LOCADOR(A): MARINA DE EXEMPLO');
+  await expect(page.locator('#dpContent')).toContainText('RG nº 42.123.456-7 - SSP/SP');
+  await expect(page.locator('#dpContent')).toContainText('pessoa jurídica de direito privado');
+  await expect(page.locator('#dpContent')).toContainText('neste ato representada por sua sócia administradora');
+
+  await page.locator('#docContractSubtype').selectOption('sale');
+  await page.locator('#docSellerClient').selectOption(representativeId);
+  await page.locator('#docBuyerClient').selectOption(companyId);
+  await expect(page.locator('#dpContent')).toContainText('VENDEDOR(A): MARINA DE EXEMPLO');
+  await expect(page.locator('#dpContent')).toContainText('COMPRADOR(A): A empresa CONTROLE EXEMPLO SISTEMAS LTDA.');
+});
+
+test('migra o estado anterior sem apagar cadastros ou criar cliente indevido', async ({ page }) => {
+  const legacy = {
+    counters: {},
+    documentCounters: {},
+    history: [],
+    documents: [],
+    draftDocuments: [],
+    templates: [],
+    contacts: [{ tenant: 'Pessoa de Migração', cpf: '52998224725', property: 'Rua de Teste, 10', active: true }],
+    draft: null,
+    management: {},
+    meta: { schemaVersion: 9, installationId: 'teste-migracao', defaultOperator: 'Sandra Marcondes da Silva Alves' }
+  };
+  await page.addInitScript(({ key, value }) => localStorage.setItem(key, JSON.stringify(value)), { key: storageKey, value: legacy });
+  await page.reload();
+
+  const migrated = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(migrated.meta.schemaVersion).toBe(10);
+  expect(migrated.contacts).toHaveLength(1);
+  expect(migrated.clients).toEqual([]);
+  await expect(page.locator('#savedTenant')).toContainText('Pessoa de Migração');
+  const backup = await page.evaluate((key) => localStorage.getItem(`${key}_antes_schema_10`), storageKey);
+  expect(backup).toContain('Pessoa de Migração');
+});
+
 test('mantém os controles essenciais visíveis sem rolagem horizontal', async ({ page, isMobile }) => {
   await page.getByRole('tab', { name: /Novo documento/i }).click();
   if (isMobile) {
