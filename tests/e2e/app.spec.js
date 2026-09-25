@@ -161,6 +161,77 @@ test('cadastra clientes PF e PJ e aplica a qualificação completa no contrato',
   await expect(page.locator('#dpContent')).toContainText('COMPRADOR(A): A empresa CONTROLE EXEMPLO SISTEMAS LTDA.');
 });
 
+test('pagina contratos longos e quebra campos extensos na prévia e na impressão', async ({ page }) => {
+  await selecionarAba(page, /Novo documento/i);
+  await page.getByRole('button', { name: 'Contrato', exact: true }).click();
+
+  const tokenLongo = 'CAMPOSEMESPACO'.repeat(45);
+  const clausulaMaiorQueUmaPagina = 'Trecho extenso de uma mesma cláusula para validar a continuação entre folhas. '.repeat(220);
+  const clausulas = [clausulaMaiorQueUmaPagina, ...Array.from({ length: 12 }, (_, index) =>
+    `${index + 1}. Cláusula demonstrativa com conteúdo suficiente para validar a paginação automática do documento. `.repeat(4)
+  )].join('\n\n');
+
+  await page.locator('#docLandlord').fill('Pessoa Locadora de Teste');
+  await page.locator('#docTenantParty').fill('Pessoa Locatária de Teste');
+  await page.locator('#docGuarantors').fill(tokenLongo);
+  await page.locator('#docContractProperty').fill(`Imóvel demonstrativo ${tokenLongo}`);
+  await page.locator('#docCustomClauses').fill(clausulas);
+  await page.locator('#docFooterEnabled').setChecked(true, { force: true });
+
+  await expect(page.locator('#genericPageWarning')).toContainText(/\b[2-9]\d* páginas A4\b/);
+
+  const preview = await page.locator('#documentPagesPreview').evaluate((container) => {
+    const pages = [...container.querySelectorAll('[data-document-preview-page]')];
+    const overflowing = pages.flatMap((sheet, pageIndex) =>
+      [...sheet.querySelectorAll('p, li, strong, span, h1, h2, .data-block')]
+        .filter((element) => element.scrollWidth > element.clientWidth + 1)
+        .map((element) => ({ pageIndex, text: element.textContent.slice(0, 40) }))
+    );
+    const verticallyClipped = pages
+      .map((sheet, pageIndex) => ({ pageIndex, clientHeight: sheet.clientHeight, scrollHeight: sheet.scrollHeight }))
+      .filter(({ clientHeight, scrollHeight }) => scrollHeight > clientHeight + 1);
+    return { pageCount: pages.length, overflowing, verticallyClipped };
+  });
+
+  expect(preview.pageCount).toBeGreaterThan(1);
+  expect(preview.overflowing).toEqual([]);
+  expect(preview.verticallyClipped).toEqual([]);
+
+  await page.evaluate(() => {
+    document.documentElement.classList.add('printing-generic');
+    document.body.classList.add('printing-generic');
+  });
+  await page.emulateMedia({ media: 'print' });
+  const printLayout = await page.evaluate(() => {
+    const pages = [...document.querySelectorAll('[data-document-preview-page]')];
+    return {
+      menuDisplay: getComputedStyle(document.querySelector('#appMenuToggle')).display,
+      navigationDisplay: getComputedStyle(document.querySelector('.app-tabs-shell')).display,
+      pageCount: pages.length,
+      footers: pages.map((sheet) => {
+        const footer = sheet.querySelector('.document-footer');
+        const sheetRect = sheet.getBoundingClientRect();
+        const footerRect = footer?.getBoundingClientRect();
+        return {
+          count: sheet.querySelectorAll('.document-footer').length,
+          position: footer ? getComputedStyle(footer).position : '',
+          bottomGap: footerRect ? sheetRect.bottom - footerRect.bottom : -1
+        };
+      })
+    };
+  });
+
+  expect(printLayout.menuDisplay).toBe('none');
+  expect(printLayout.navigationDisplay).toBe('none');
+  expect(printLayout.footers.every(({ count, position, bottomGap }) =>
+    count === 1 && position === 'absolute' && bottomGap > 30 && bottomGap < 45
+  )).toBe(true);
+
+  const pdf = await page.pdf({ format: 'A4', preferCSSPageSize: true, printBackground: true });
+  const pdfText = pdf.toString('latin1');
+  expect((pdfText.match(/\/Type\s*\/Page\b/g) || []).length).toBe(printLayout.pageCount);
+});
+
 test('migra o estado anterior sem apagar cadastros ou criar cliente indevido', async ({ page }) => {
   const legacy = {
     counters: {},

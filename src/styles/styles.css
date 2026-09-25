@@ -2248,6 +2248,8 @@ summary:focus-visible,
     overflow: hidden !important;
   }
   .app-header,
+  .app-tabs-shell,
+  .app-menu-toggle,
   .app-tabs,
   .panel,
   .preview-toolbar,
@@ -2526,39 +2528,65 @@ summary:focus-visible,
   margin: 0 auto;
   overflow: hidden;
   border-radius: 5px;
-  box-shadow: 0 16px 38px rgba(27, 34, 43, 0.18);
+}
+.document-pages-preview {
+  display: grid;
+  width: 210mm;
+  gap: 16px;
+  transform: scale(var(--document-preview-scale, 1));
+  transform-origin: top left;
+}
+.document-pagination-measure {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  width: 210mm;
+  visibility: hidden;
+  pointer-events: none;
+}
+.document-preview-source {
+  display: none !important;
 }
 .document-preview {
   position: relative;
   width: 210mm;
+  height: 297mm;
   min-height: 297mm;
   padding: 17mm 18mm 18mm;
   background: #fff;
   color: #222;
   font: 12pt/1.55 Arial, sans-serif;
-  transform: scale(var(--document-preview-scale, 1));
-  transform-origin: top left;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.document-preview-page {
+  box-shadow: 0 16px 38px rgba(27, 34, 43, 0.18);
 }
 .document-preview.has-footer {
   padding-bottom: 29mm;
 }
 .document-preview::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(297mm - 1px),
-    rgba(183, 13, 24, 0.12) calc(297mm - 1px),
-    rgba(183, 13, 24, 0.12) 297mm
-  );
-  opacity: 0.55;
+  display: none;
 }
 .document-preview > * {
   position: relative;
   z-index: 1;
+}
+.document-page-body,
+.document-page-flow,
+.document-content,
+.document-content > *,
+.document-signatures,
+.document-signature,
+.document-letterhead > *,
+.document-meta > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.document-page-flow.document-content {
+  min-height: 0;
 }
 .document-letterhead {
   display: grid;
@@ -2590,6 +2618,16 @@ summary:focus-visible,
 }
 .document-repeat-header {
   display: none;
+}
+.document-repeat-header.is-visible {
+  display: flex;
+  justify-content: space-between;
+  gap: 8mm;
+  margin-bottom: 7mm;
+  padding-bottom: 2mm;
+  border-bottom: 0.4mm solid #b70d18;
+  color: #666;
+  font-size: 7pt;
 }
 .document-meta {
   display: flex;
@@ -2640,11 +2678,23 @@ summary:focus-visible,
   margin-bottom: 3mm;
   break-inside: avoid;
 }
+.document-content .document-list-continuation {
+  list-style: none;
+}
+.document-content .document-text-continuation {
+  margin-top: 0;
+}
 .document-signatures {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 15mm 12mm;
   margin-top: 17mm;
+}
+.document-signatures-group {
+  break-inside: avoid;
+}
+.document-preview-page .document-signatures {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .document-signature {
   min-height: 20mm;
@@ -2659,15 +2709,21 @@ summary:focus-visible,
   font-size: 9pt;
 }
 .document-footer {
-  margin-top: 12mm;
+  position: absolute !important;
+  right: 18mm;
+  bottom: 10mm;
+  left: 18mm;
   padding-top: 3mm;
   border-top: 0.5mm solid #b70d18;
+  background: #fff;
   color: #555;
   font-size: 7pt;
   text-align: center;
 }
 .document-page-number {
-  margin-top: 4mm;
+  position: absolute !important;
+  right: 18mm;
+  bottom: 4mm;
   color: #777;
   font-size: 7pt;
   text-align: right;
@@ -2774,6 +2830,63 @@ summary:focus-visible,
 @media (max-width: 380px) {
   .document-type-options {
     grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body.printing-generic #documentPreview {
+    display: none !important;
+  }
+  body.printing-generic .document-pages-preview {
+    display: block !important;
+    width: 210mm !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    transform: none !important;
+  }
+  body.printing-generic .document-preview-page {
+    display: block !important;
+    position: relative !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 !important;
+    padding: 17mm 18mm 18mm !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+    break-after: page;
+    page-break-after: always;
+  }
+  body.printing-generic .document-preview-page.has-footer {
+    padding-bottom: 29mm !important;
+  }
+  body.printing-generic .document-preview-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  body.printing-generic .document-repeat-header.is-visible {
+    position: static;
+    display: flex !important;
+  }
+  body.printing-generic .document-footer,
+  body.printing-generic .document-page-number,
+  body.printing-generic .document-watermark {
+    position: absolute !important;
+  }
+  body.printing-generic .document-footer {
+    right: 18mm !important;
+    bottom: 10mm !important;
+    left: 18mm !important;
+    display: block !important;
+    margin: 0 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  body.printing-generic .document-page-number::after {
+    content: none !important;
   }
 }
 

@@ -463,7 +463,7 @@
     if (currentDocumentType === 'receipt') {
       const shell = document.querySelector('.page-shell'), receipt = $('receipt'); if (!shell || !receipt) return; const baseWidth = receipt.offsetWidth || 794, baseHeight = receipt.offsetHeight || 1123, scale = Math.min(1, available / baseWidth); receipt.style.setProperty('--preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
     } else {
-      const shell = $('documentPageShell'), doc = $('documentPreview'); if (!shell || !doc) return; const baseWidth = doc.offsetWidth || 794, baseHeight = Math.max(doc.scrollHeight || 1123, 1123), scale = Math.min(1, available / baseWidth); doc.style.setProperty('--document-preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
+      const shell = $('documentPageShell'), pages = $('documentPagesPreview'); if (!shell || !pages) return; const firstPage = pages.querySelector('[data-document-preview-page]'), baseWidth = firstPage?.offsetWidth || 794, baseHeight = Math.max(pages.scrollHeight || 1123, 1123), scale = Math.min(1, available / baseWidth); pages.style.setProperty('--document-preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
     }
   }
   function atualizarVisaoSeguranca() { $('safetyReceiptsCount').textContent = String(state.history.length); $('safetyDocumentsCount').textContent = String(state.documents.length); $('safetyDraftsCount').textContent = String(state.draftDocuments.length + (state.draft ? 1 : 0)); $('safetyTemplatesCount').textContent = String(state.templates.length); $('safetyContactsCount').textContent = String(state.contacts.length); $('safetyClientsCount').textContent = String(state.clients.length); $('safetySchemaVersion').textContent = String(SCHEMA_VERSION); $('safetyLastBackup').textContent = state.meta.lastBackupAt ? dataHora(state.meta.lastBackupAt) : 'Não registrado'; }
@@ -735,12 +735,195 @@
   function assinaturaElemento(nome, detalhe = '') { const div = document.createElement('div'); div.className = 'document-signature'; const strong = document.createElement('strong'); strong.textContent = nome || 'Assinatura'; div.appendChild(strong); if (detalhe) { const span = document.createElement('span'); span.textContent = detalhe; div.appendChild(span); } return div; }
   function adicionarParteContrato(container, rotulo, texto) { const p = document.createElement('p'); p.className = 'contract-party'; const strong = document.createElement('strong'); strong.textContent = rotulo + ': '; p.append(strong, document.createTextNode(texto || 'Não informado.')); container.appendChild(p); }
   function linhasClausulas(f) { const selecionadas = (f.selectedClauses || []).map(k => CLAUSE_LIBRARY[k]).filter(Boolean), personalizadas = String(f.docCustomClauses || '').split(/\n\s*\n/).map(x => x.trim()).filter(Boolean); return [...selecionadas, ...personalizadas]; }
+  function clonarParaPreview(elemento) {
+    const clone = elemento.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.querySelectorAll('[id]').forEach(item => item.removeAttribute('id'));
+    return clone;
+  }
+  function paginarDocumentoPreview() {
+    const source = $('documentPreview'), target = $('documentPagesPreview');
+    if (!source || !target) return 1;
+
+    const measure = document.createElement('div');
+    measure.className = 'document-pagination-measure';
+    const pagesHost = document.createElement('div');
+    pagesHost.className = 'document-pages-preview';
+    measure.appendChild(pagesHost);
+    document.body.appendChild(measure);
+
+    let pageNumber = 0;
+    const createPage = () => {
+      pageNumber += 1;
+      const page = document.createElement('article');
+      page.className = 'document-preview document-preview-page';
+      page.dataset.documentPreviewPage = String(pageNumber);
+      if (source.classList.contains('has-footer')) page.classList.add('has-footer');
+      if (source.classList.contains('has-repeat-header')) page.classList.add('has-repeat-header');
+
+      const watermark = $('documentWatermark');
+      if (watermark && !watermark.hidden) page.appendChild(clonarParaPreview(watermark));
+
+      const body = document.createElement('div');
+      body.className = 'document-page-body';
+      if (pageNumber === 1) {
+        const letterhead = $('documentLetterhead');
+        if (letterhead && !letterhead.hidden) body.appendChild(clonarParaPreview(letterhead));
+        body.append(clonarParaPreview(source.querySelector('.document-meta')), clonarParaPreview(source.querySelector('h1')));
+      } else if (source.classList.contains('has-repeat-header')) {
+        const repeatHeader = source.querySelector('.document-repeat-header');
+        if (repeatHeader) {
+          const repeated = clonarParaPreview(repeatHeader);
+          repeated.classList.add('is-visible');
+          body.appendChild(repeated);
+        }
+      }
+
+      const flow = document.createElement('div');
+      flow.className = 'document-page-flow document-content';
+      body.appendChild(flow);
+      page.appendChild(body);
+
+      const footer = $('dpFooter');
+      if (footer && !footer.hidden) page.appendChild(clonarParaPreview(footer));
+      const number = document.createElement('div');
+      number.className = 'document-page-number';
+      number.setAttribute('aria-hidden', 'true');
+      page.appendChild(number);
+      pagesHost.appendChild(page);
+      return { page, flow };
+    };
+    const overflows = current => current.page.scrollHeight > current.page.clientHeight + 1;
+    let current = createPage();
+
+    const fittedCharacterCount = (element, text) => {
+      let low = 0, high = text.length;
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2);
+        element.textContent = text.slice(0, middle);
+        if (overflows(current)) high = middle - 1;
+        else low = middle;
+      }
+      return low;
+    };
+    const safeTextBreak = (text, fitted) => {
+      if (fitted >= text.length) return text.length;
+      const whitespace = text.lastIndexOf(' ', fitted);
+      return whitespace >= Math.max(1, fitted - 80) ? whitespace : fitted;
+    };
+    const moveTrailingHeading = () => {
+      const possibleHeading = current.flow.lastElementChild;
+      const heading = possibleHeading?.matches('h2') ? possibleHeading : null;
+      if (heading) heading.remove();
+      current = createPage();
+      if (heading) current.flow.appendChild(heading);
+    };
+    const appendTextAcrossPages = element => {
+      let remaining = String(element.textContent || '').trim(), continuation = false;
+      while (remaining) {
+        const fragment = element.cloneNode(false);
+        if (continuation) fragment.classList.add('document-text-continuation');
+        fragment.textContent = remaining;
+        current.flow.appendChild(fragment);
+        if (!overflows(current)) return;
+
+        const fitted = fittedCharacterCount(fragment, remaining);
+        if (fitted < 40) {
+          fragment.remove();
+          moveTrailingHeading();
+          continue;
+        }
+        const splitAt = safeTextBreak(remaining, fitted);
+        fragment.textContent = remaining.slice(0, splitAt).trimEnd();
+        remaining = remaining.slice(splitAt).trimStart();
+        continuation = true;
+        current = createPage();
+      }
+    };
+
+    const appendBlock = element => {
+      const block = clonarParaPreview(element);
+      current.flow.appendChild(block);
+      if (!overflows(current)) return;
+      block.remove();
+      if (element.matches('p')) {
+        appendTextAcrossPages(element);
+        return;
+      }
+      moveTrailingHeading();
+      current.flow.appendChild(block);
+      if (overflows(current) && String(element.textContent || '').trim()) {
+        block.remove();
+        appendTextAcrossPages(element);
+      }
+    };
+
+    [...$('dpContent').children].forEach(element => {
+      if (element.tagName !== 'OL') {
+        appendBlock(element);
+        return;
+      }
+      const listTemplate = element.cloneNode(false);
+      let list = null;
+      [...element.children].forEach((item, index) => {
+        let remaining = String(item.textContent || '').trim(), continuation = false;
+        while (remaining) {
+          if (!list || list.parentElement !== current.flow) {
+            list = listTemplate.cloneNode(false);
+            list.start = index + 1;
+            current.flow.appendChild(list);
+          }
+          const listItem = item.cloneNode(false);
+          if (continuation) listItem.classList.add('document-list-continuation');
+          listItem.textContent = remaining;
+          list.appendChild(listItem);
+          if (!overflows(current)) break;
+
+          const fitted = fittedCharacterCount(listItem, remaining);
+          if (fitted < 40) {
+            listItem.remove();
+            if (!list.children.length) list.remove();
+            moveTrailingHeading();
+            list = null;
+            continue;
+          }
+          const splitAt = safeTextBreak(remaining, fitted);
+          listItem.textContent = remaining.slice(0, splitAt).trimEnd();
+          remaining = remaining.slice(splitAt).trimStart();
+          continuation = true;
+          current = createPage();
+          list = null;
+        }
+      });
+    });
+
+    const signatures = [...$('dpSignatures').children];
+    for (let index = 0; index < signatures.length; index += 2) {
+      const group = document.createElement('div');
+      group.className = 'document-signatures document-signatures-group';
+      signatures.slice(index, index + 2).forEach(signature => group.appendChild(clonarParaPreview(signature)));
+      current.flow.appendChild(group);
+      if (!overflows(current)) continue;
+      group.remove();
+      current = createPage();
+      current.flow.appendChild(group);
+    }
+
+    const pages = [...pagesHost.children];
+    pages.forEach((page, index) => {
+      page.setAttribute('aria-label', 'Página ' + (index + 1) + ' de ' + pages.length);
+      page.querySelector('.document-page-number').textContent = 'Página ' + (index + 1) + ' de ' + pages.length;
+    });
+    target.replaceChildren(...pages);
+    measure.remove();
+    return pages.length || 1;
+  }
   function atualizarDocumentoGenerico() {
     if (currentDocumentType === 'receipt') return; const d = activeGenericRecord || dadosDocumentoGenerico(), f = d.fields, content = $('dpContent'), signatures = $('dpSignatures'); content.replaceChildren(); signatures.replaceChildren(); $('genericNumberLabel').textContent = activeGenericRecord ? d.number : numeroDocumento(currentDocumentType, f.docDate); $('genericPreviewLabel').textContent = rotuloTipo(currentDocumentType); $('dpNumber').textContent = (d.status === 'draft' ? 'RASCUNHO · ' : rotuloTipo(d.type).toUpperCase() + ' Nº ') + (d.number || numeroDocumento(d.type, f.docDate)); $('dpDate').textContent = (f.docCity || 'Araçariguama/SP') + ', ' + dataLonga(f.docDate || hoje()); $('dpTitle').textContent = f.docTitle || tituloPadraoDocumento(d.type); $('dpRepeatTitle').textContent = f.docTitle || rotuloTipo(d.type); const timbre = d.letterhead || f.docLetterhead || 'none'; $('documentLetterhead').hidden = timbre === 'none'; $('documentPreview').classList.toggle('has-repeat-header', timbre === 'repeat'); $('documentPreview').classList.toggle('has-footer', d.footerEnabled === true); $('dpFooter').hidden = !d.footerEnabled;
     if (d.type === 'declaration') { if (f.docRecipient) adicionarTexto(content, 'Ao(À) ' + f.docRecipient + '.'); adicionarBloco(content, ['Declarante: ' + (f.docDeclarant || 'Não informado'), 'Documento: ' + (f.docDeclarantDocument || 'Não informado'), 'Assunto: ' + (f.docSubject || 'Não informado'), f.docPurpose ? 'Finalidade: ' + f.docPurpose : '']); adicionarTexto(content, f.docBody || 'Preencha o texto da declaração.'); signatures.appendChild(assinaturaElemento(f.docDeclarant || 'Declarante', f.docDeclarantDocument || '')); signatures.appendChild(assinaturaElemento(f.docOperator || operadores[0], 'S.A. Paraíba Imóveis J.R. Ltda.')); }
     if (d.type === 'term') { adicionarBloco(content, ['Primeira parte: ' + (f.docPartyOne || 'Não informada') + (f.docPartyOneDocument ? ' — ' + f.docPartyOneDocument : ''), f.docPartyTwo ? 'Segunda parte: ' + f.docPartyTwo + (f.docPartyTwoDocument ? ' — ' + f.docPartyTwoDocument : '') : '', 'Imóvel/objeto: ' + (f.docProperty || 'Não informado'), f.docRelatedContract ? 'Documento relacionado: ' + f.docRelatedContract : '', f.docEffectiveDate ? 'Data de efeito: ' + dataLonga(f.docEffectiveDate) : '', f.docDeadline ? 'Prazo: ' + f.docDeadline : '', f.docKeysQuantity ? 'Chaves: ' + f.docKeysQuantity : '']); if (f.docTermSubtype === 'rectification') { adicionarTituloSecao(content, 'Retificação'); adicionarTexto(content, 'Onde consta: ' + (f.docCorrectionFrom || '—')); adicionarTexto(content, 'Passa a constar: ' + (f.docCorrectionTo || '—')); adicionarTexto(content, 'Permanecem inalteradas e ratificadas as demais disposições do documento original.'); } adicionarTituloSecao(content, 'Obrigações e condições'); adicionarTexto(content, f.docObligations || 'Preencha as obrigações e condições.'); if (f.docObservations) { adicionarTituloSecao(content, 'Observações'); adicionarTexto(content, f.docObservations); } signatures.appendChild(assinaturaElemento(f.docPartyOne || 'Primeira parte', f.docPartyOneDocument || '')); if (f.docPartyTwo) signatures.appendChild(assinaturaElemento(f.docPartyTwo, f.docPartyTwoDocument || '')); String(f.docSignatures || '').split('\n').map(x => x.trim()).filter(Boolean).forEach(x => signatures.appendChild(assinaturaElemento(x))); signatures.appendChild(assinaturaElemento(f.docOperator || operadores[0], 'Responsável pela emissão')); }
     if (d.type === 'contract') { const sub = f.docContractSubtype || 'lease', party = (key) => f[key + 'Qualification'] || ((f[key] || 'Não informado') + (f[key + 'Document'] ? ' — ' + f[key + 'Document'] : '')); if (sub === 'lease') { adicionarParteContrato(content, 'LOCADOR(A)', party('docLandlord')); adicionarParteContrato(content, 'LOCATÁRIO(A)', party('docTenantParty')); if (f.docGuarantors) adicionarParteContrato(content, 'FIADOR(ES)', f.docGuarantors); } else if (sub === 'sale') { adicionarParteContrato(content, 'VENDEDOR(A)', party('docSeller')); adicionarParteContrato(content, 'COMPRADOR(A)', party('docBuyer')); } else { adicionarParteContrato(content, 'PROPRIETÁRIO(A)', party('docLandlord')); adicionarParteContrato(content, 'ADMINISTRADORA', 'S.A. Paraíba Imóveis J.R. Ltda. — CNPJ 09.534.406/0001-29'); } adicionarTituloSecao(content, 'Objeto'); adicionarTexto(content, f.docContractProperty || 'Preencha o imóvel ou objeto do contrato.'); adicionarBloco(content, [f.docContractPurpose ? 'Finalidade: ' + f.docContractPurpose : '', f.docStartDate ? 'Início: ' + dataLonga(f.docStartDate) : '', f.docEndDate ? 'Término: ' + dataLonga(f.docEndDate) : '', f.docContractValue ? 'Valor: R$ ' + f.docContractValue : '', f.docContractDueDay ? 'Vencimento: dia ' + f.docContractDueDay : '', f.docAdjustment ? 'Reajuste: ' + f.docAdjustment : '', f.docGuarantee ? 'Garantia: ' + f.docGuarantee : '']); adicionarTituloSecao(content, 'Cláusulas e condições'); const ol = document.createElement('ol'); linhasClausulas(f).forEach(texto => { const li = document.createElement('li'); li.textContent = texto; ol.appendChild(li); }); if (!ol.children.length) { const li = document.createElement('li'); li.textContent = 'Adicione as cláusulas do contrato.'; ol.appendChild(li); } content.appendChild(ol); if (sub === 'lease') { signatures.appendChild(assinaturaElemento(f.docLandlord || 'Locador(a)', f.docLandlordDocument || '')); signatures.appendChild(assinaturaElemento(f.docTenantParty || 'Locatário(a)', f.docTenantPartyDocument || '')); } else if (sub === 'sale') { signatures.appendChild(assinaturaElemento(f.docSeller || 'Vendedor(a)', f.docSellerDocument || '')); signatures.appendChild(assinaturaElemento(f.docBuyer || 'Comprador(a)', f.docBuyerDocument || '')); } else { signatures.appendChild(assinaturaElemento(f.docLandlord || 'Proprietário(a)', f.docLandlordDocument || '')); signatures.appendChild(assinaturaElemento(f.docOperator || operadores[0], 'S.A. Paraíba Imóveis J.R. Ltda.')); } if (f.docWitnessOne) signatures.appendChild(assinaturaElemento(f.docWitnessOne, 'Testemunha · ' + (f.docWitnessOneDocument || ''))); if (f.docWitnessTwo) signatures.appendChild(assinaturaElemento(f.docWitnessTwo, 'Testemunha · ' + (f.docWitnessTwoDocument || ''))); }
-    const status = statusDocumento(d); $('documentWatermark').textContent = status === 'draft' ? 'RASCUNHO' : status === 'canceled' ? 'CANCELADO' : status === 'archived' ? 'ARQUIVADO' : ''; $('documentWatermark').hidden = status === 'issued'; $('genericStatus').className = 'generic-status ' + status; $('genericStatus').textContent = status === 'draft' ? (editingGenericDraftId ? 'Rascunho salvo — continue editando ou emita quando estiver pronto.' : 'Rascunho novo — ' + (timbre === 'none' ? 'sem timbre' : 'com timbre') + '.') : rotuloTipo(d.type) + ' ' + d.number + ' — ' + rotuloStatus(status).toLowerCase() + '.'; $('genericPrintBtn').disabled = !activeGenericRecord; $('genericIssueBtn').disabled = !!activeGenericRecord; $('genericSaveDraftBtn').disabled = !!activeGenericRecord; $('genericSaveTemplateBtn').disabled = !!activeGenericRecord; $('genericDuplicateBtn').hidden = !activeGenericRecord; requestAnimationFrame(() => { const paginas = Math.max(1, Math.ceil(($('documentPreview').scrollHeight || 1123) / 1123)); $('genericPageWarning').textContent = paginas > 1 ? 'Documento multipágina: aproximadamente ' + paginas + ' páginas A4. As assinaturas e cláusulas evitam quebras internas sempre que possível.' : 'Conteúdo estimado em uma página A4.'; ajustarAlturaMobile(); });
+    const status = statusDocumento(d); $('documentWatermark').textContent = status === 'draft' ? 'RASCUNHO' : status === 'canceled' ? 'CANCELADO' : status === 'archived' ? 'ARQUIVADO' : ''; $('documentWatermark').hidden = status === 'issued'; $('genericStatus').className = 'generic-status ' + status; $('genericStatus').textContent = status === 'draft' ? (editingGenericDraftId ? 'Rascunho salvo — continue editando ou emita quando estiver pronto.' : 'Rascunho novo — ' + (timbre === 'none' ? 'sem timbre' : 'com timbre') + '.') : rotuloTipo(d.type) + ' ' + d.number + ' — ' + rotuloStatus(status).toLowerCase() + '.'; $('genericPrintBtn').disabled = !activeGenericRecord; $('genericIssueBtn').disabled = !!activeGenericRecord; $('genericSaveDraftBtn').disabled = !!activeGenericRecord; $('genericSaveTemplateBtn').disabled = !!activeGenericRecord; $('genericDuplicateBtn').hidden = !activeGenericRecord; requestAnimationFrame(() => { const paginas = paginarDocumentoPreview(); $('genericPageWarning').textContent = paginas > 1 ? 'Documento multipágina: ' + paginas + ' páginas A4. Campos extensos, cláusulas e assinaturas foram distribuídos automaticamente.' : 'Conteúdo distribuído em uma página A4.'; ajustarAlturaMobile(); });
   }
   function travarDocumentoGenerico(travado) { camposGenericosElementos().forEach(el => el.disabled = travado); document.querySelectorAll('[data-clause]').forEach(el => el.disabled = travado); $('docQuickContact').disabled = travado; $('docTemplate').disabled = travado; }
   function salvarRascunhoGenerico() { if (storageCorrupted) { toast('Resolva a recuperação dos dados antes de salvar.', true); return; } const base = dadosDocumentoGenerico(), agora = new Date().toISOString(), registro = normalizarDocumentoGenerico({ ...base, id: editingGenericDraftId || base.id, status: 'draft', updatedAt: agora, createdAt: agora }, { draft: true }); let drafts = state.draftDocuments.filter(x => x.id !== registro.id); drafts.push(registro); if (!persistir({ ...state, draftDocuments: drafts })) return; editingGenericDraftId = registro.id; genericDirty = false; renderHistorico(); atualizarVisaoSeguranca(); atualizarDocumentoGenerico(); toast('Rascunho de ' + rotuloTipo(registro.type).toLowerCase() + ' salvo.'); }
@@ -752,7 +935,7 @@
   function excluirRascunhoGenerico(id) { if (!confirm('Excluir este rascunho?')) return; const drafts = state.draftDocuments.filter(x => x.id !== id); if (!persistir({ ...state, draftDocuments: drafts })) return; if (editingGenericDraftId === id) { editingGenericDraftId = ''; genericDirty = false; } renderHistorico(); atualizarVisaoSeguranca(); toast('Rascunho excluído.'); }
   function nomeArquivoDocumento(r) { const nome = normalizarTexto(nomePrincipalDocumento(r)).split(' ').filter(Boolean).slice(0, 4).map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('_') || 'Documento'; return rotuloTipo(r.type).replace(/ç/g, 'c').replace(/ã/g, 'a') + '_' + (r.status === 'canceled' ? 'CANCELADO_' : '') + String(r.number || 'Rascunho').replace('/', '-') + '_' + nome; }
   function registrarImpressaoDocumento(id) { state = lerEstado(); const agora = new Date().toISOString(), documents = state.documents.map(r => r.id === id ? { ...r, printCount: (Number(r.printCount) || 0) + 1, lastPrintedAt: agora } : r); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(r => r.id === id) }); renderHistorico(); }
-  function imprimirDocumentoGenerico() { if (!activeGenericRecord) { toast('Emita e registre o documento antes de imprimir.', true); return; } const anterior = document.title, nome = nomeArquivoDocumento(activeGenericRecord); document.title = nome; document.body.classList.add('printing-generic'); document.documentElement.classList.add('printing-generic'); atualizarDocumentoGenerico(); let restaurado = false; const restaurar = () => { if (restaurado) return; restaurado = true; document.title = anterior; document.body.classList.remove('printing-generic'); document.documentElement.classList.remove('printing-generic'); }; const id = activeGenericRecord.id; window.addEventListener('afterprint', () => { registrarImpressaoDocumento(id); restaurar(); }, { once: true }); setTimeout(restaurar, 5000); toast('Nome sugerido para o PDF: ' + nome + '.pdf'); window.print(); }
+  function imprimirDocumentoGenerico() { if (!activeGenericRecord) { toast('Emita e registre o documento antes de imprimir.', true); return; } const anterior = document.title, nome = nomeArquivoDocumento(activeGenericRecord); document.title = nome; document.body.classList.add('printing-generic'); document.documentElement.classList.add('printing-generic'); atualizarDocumentoGenerico(); paginarDocumentoPreview(); let restaurado = false; const restaurar = () => { if (restaurado) return; restaurado = true; document.title = anterior; document.body.classList.remove('printing-generic'); document.documentElement.classList.remove('printing-generic'); }; const id = activeGenericRecord.id; window.addEventListener('afterprint', () => { registrarImpressaoDocumento(id); restaurar(); }, { once: true }); setTimeout(restaurar, 5000); toast('Nome sugerido para o PDF: ' + nome + '.pdf'); window.print(); }
   function salvarModeloAtual() { if (currentDocumentType === 'receipt') { toast('O recibo possui modelo institucional fixo.', true); return; } const nome = prompt('Nome do novo modelo de ' + rotuloTipo(currentDocumentType).toLowerCase() + ':'); if (nome === null) return; if (nome.trim().length < 3) { toast('Informe um nome com pelo menos 3 caracteres.', true); return; } const agora = new Date().toISOString(), modelo = normalizarModelo({ id: idDocumento(), name: nome.trim(), type: currentDocumentType, fields: coletarCamposGenericos(), active: true, createdAt: agora, updatedAt: agora }); if (!persistir({ ...state, templates: [...state.templates, modelo] })) return; atualizarOpcoesModelos(); $('docTemplate').value = modelo.id; renderModelos(); atualizarVisaoSeguranca(); toast('Modelo personalizado salvo.'); }
   function renderModelos() { const box = $('templatesList'); if (!box) return; const busca = normalizarTexto($('templatesSearch').value), filtro = $('templatesStatus').value, lista = state.templates.filter(t => (filtro === 'all' || (filtro === 'active' && t.active !== false) || (filtro === 'inactive' && t.active === false)) && (!busca || normalizarTexto(t.name + ' ' + rotuloTipo(t.type)).includes(busca))).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')); $('templatesSummary').innerHTML = '<strong>' + lista.length + '</strong> exibido(s) · <strong>' + state.templates.filter(t => t.active !== false).length + '</strong> ativo(s)'; box.replaceChildren(); if (!lista.length) { const e = document.createElement('div'); e.className = 'empty-state'; e.textContent = state.templates.length ? 'Nenhum modelo corresponde aos filtros.' : 'Nenhum modelo personalizado salvo.'; box.appendChild(e); return; } lista.forEach(t => { const card = document.createElement('article'); card.className = 'template-card' + (t.active === false ? ' is-inactive' : ''); const h = document.createElement('h3'); h.textContent = t.name; const p = document.createElement('p'); p.textContent = rotuloTipo(t.type) + ' · ' + (t.active === false ? 'inativo' : 'ativo') + ' · criado em ' + dataHora(t.createdAt); const actions = document.createElement('div'); actions.className = 'contact-actions'; if (t.active !== false) actions.append(botaoHistorico('Usar modelo', () => { selecionarTipoDocumento(t.type, { ignorarConfirmacao: true }); $('docTemplate').value = t.id; aplicarModeloSelecionado(); ativarView('new'); }, 'primary')); actions.append(botaoHistorico(t.active === false ? 'Reativar' : 'Inativar', () => { const templates = state.templates.map(x => x.id === t.id ? { ...x, active: t.active === false, updatedAt: new Date().toISOString() } : x); if (persistir({ ...state, templates })) { renderModelos(); atualizarOpcoesModelos(); } }, t.active === false ? '' : 'danger'), botaoHistorico('Excluir', () => { if (confirm('Excluir definitivamente o modelo “' + t.name + '”?')) { const templates = state.templates.filter(x => x.id !== t.id); if (persistir({ ...state, templates })) { renderModelos(); atualizarOpcoesModelos(); atualizarVisaoSeguranca(); } } }, 'danger')); card.append(h, p, actions); box.appendChild(card); }); }
   function nomePrincipalDocumento(r) { const f = r.fields || {}; if (r.type === 'receipt') return r.tenant || ''; if (r.type === 'declaration') return f.docDeclarant || ''; if (r.type === 'term') return f.docPartyOne || ''; if (r.type === 'contract') { const sub = f.docContractSubtype; return sub === 'sale' ? (f.docBuyer || f.docSeller || '') : (f.docTenantParty || f.docLandlord || ''); } return ''; }
