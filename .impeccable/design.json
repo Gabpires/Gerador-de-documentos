@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-28T11:02:34.7011157-03:00",
+  "title": "Design System: Paraíba Imóveis",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Vermelho Institucional",
+        "canonical": "#b70d18",
+        "tonalRamp": ["#3d050a", "#66070e", "#8f0710", "#b70d18", "#d51a27", "#eb6570", "#f6a7ad", "#fff1f2"]
+      },
+      "primary-dark": {
+        "role": "primary",
+        "displayName": "Vermelho Profundo",
+        "canonical": "#8f0710",
+        "tonalRamp": ["#320306", "#51050a", "#70080d", "#8f0710", "#b70d18", "#dc3540", "#ef858d", "#fff0f1"]
+      },
+      "primary-soft": {
+        "role": "neutral",
+        "displayName": "Vermelho Suave",
+        "canonical": "#fff1f2",
+        "tonalRamp": ["#5e2228", "#883a42", "#b65f69", "#dc9098", "#f1bdc2", "#fad7da", "#fff1f2", "#fff9f9"]
+      },
+      "routine-info": {
+        "role": "secondary",
+        "displayName": "Azul de Informação",
+        "canonical": "#57C4E5",
+        "tonalRamp": ["#103947", "#1d6176", "#2e8eaa", "#57C4E5", "#81d3eb", "#afe2f2", "#d7f1f9", "#f2fbfd"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Papel Operacional",
+        "canonical": "#fff",
+        "tonalRamp": ["#20242b", "#414852", "#68717d", "#a4abb3", "#c9ced4", "#e4e7eb", "#f4f5f7", "#fff"]
+      },
+      "surface-muted": {
+        "role": "neutral",
+        "displayName": "Superfície Suave",
+        "canonical": "#f7f8fa",
+        "tonalRamp": ["#252a31", "#444c57", "#6c7580", "#9aa2ab", "#c0c6cd", "#dde1e5", "#f0f2f4", "#f7f8fa"]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Tela Fria",
+        "canonical": "#eef1f5",
+        "tonalRamp": ["#20252c", "#3d4652", "#687584", "#9ea8b5", "#cbd2db", "#e0e5eb", "#eef1f5", "#fafbfd"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Borda Calma",
+        "canonical": "#dde2e8",
+        "tonalRamp": ["#2f3741", "#4d5865", "#73808e", "#9ca8b4", "#bcc5ce", "#d4dae0", "#dde2e8", "#f5f7f9"]
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Borda de Controle",
+        "canonical": "#c9d0d8",
+        "tonalRamp": ["#29313a", "#48535f", "#6d7986", "#929da8", "#b1bac3", "#c9d0d8", "#e1e5e9", "#f6f7f8"]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Grafite de Leitura",
+        "canonical": "#20242b",
+        "tonalRamp": ["#15181d", "#20242b", "#3e4651", "#697481", "#9ca5ae", "#c4cad0", "#e4e7eb", "#f7f8fa"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Texto de Apoio",
+        "canonical": "#68717d",
+        "tonalRamp": ["#26303a", "#3f4a56", "#56616e", "#68717d", "#9098a2", "#b6bcc3", "#dce0e4", "#f4f5f6"]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Sucesso Operacional",
+        "canonical": "#237a43",
+        "tonalRamp": ["#0d2e19", "#164a29", "#1c6336", "#237a43", "#4c9e68", "#82bd96", "#b9dbc3", "#eaf7ee"]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Aviso Operacional",
+        "canonical": "#8a6116",
+        "tonalRamp": ["#352405", "#543a09", "#704d0f", "#8a6116", "#b58a34", "#d5b76d", "#ead7a7", "#fff8e8"]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Perigo Operacional",
+        "canonical": "#b42318",
+        "tonalRamp": ["#3a0b07", "#61120d", "#891a12", "#b42318", "#d65a51", "#eb918b", "#f6c3bf", "#fff4f3"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Título de Área",
+        "purpose": "Nomeia áreas e contextos de trabalho sem disputar atenção com o documento."
+      },
+      "body": {
+        "displayName": "Texto Operacional",
+        "purpose": "Sustenta instruções, documentos e dados de leitura prolongada."
+      },
+      "label": {
+        "displayName": "Rótulo de Campo",
+        "purpose": "Nomeia cada dado antes da entrada e preserva a compreensão assistida."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ui-baixa",
+        "value": "0 12px 32px rgba(22, 29, 37, 0.08)",
+        "purpose": "Separa cartões e painéis persistentes da tela fria."
+      },
+      {
+        "name": "documento",
+        "value": "0 16px 38px rgba(27, 34, 43, 0.18)",
+        "purpose": "Dá presença física à folha A4 na prévia."
+      },
+      {
+        "name": "menu-contextual",
+        "value": "0 16px 32px rgba(22, 29, 37, 0.16)",
+        "purpose": "Eleva ações transitórias acima da lista sem criar ruído permanente."
+      }
+    ],
+    "motion": [
+      {
+        "name": "entrada-de-aba",
+        "value": "0.18s ease-out",
+        "purpose": "Mostra a troca de área com deslocamento sutil e sem atrasar a operação."
+      },
+      {
+        "name": "movimento-reduzido",
+        "value": "0.01ms",
+        "purpose": "Respeita prefers-reduced-motion para animações e transições."
+      }
+    ],
+    "breakpoints": [
+      { "name": "wide", "value": "1280px" },
+      { "name": "compact", "value": "1180px" },
+      { "name": "tablet", "value": "900px" },
+      { "name": "mobile", "value": "767px" },
+      { "name": "narrow", "value": "380px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão primário",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Confirma emissão, criação ou outra ação operacional principal.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Emitir documento</button>",
+      "css": ".ds-btn-primary { min-height: 44px; padding: 12px 14px; border: 0; border-radius: 10px; background: var(--brand, #b70d18); color: #fff; font: 800 12px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-btn-primary:hover { background: var(--brand-dark, #8f0710); } .ds-btn-primary:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+    },
+    {
+      "name": "Botão secundário",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Oferece ações de apoio sem competir com a emissão.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Salvar rascunho</button>",
+      "css": ".ds-btn-secondary { min-height: 44px; padding: 12px 14px; border: 0; border-radius: 10px; background: #eef1f4; color: #303640; font: 800 12px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-btn-secondary:hover { background: #e5e8ec; } .ds-btn-secondary:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+    },
+    {
+      "name": "Campo de formulário",
+      "kind": "input",
+      "refersTo": "field-input",
+      "description": "Recebe dados operacionais com rótulo e estado de foco claramente associados.",
+      "html": "<label class=\"ds-field\">Nome do locatário<input class=\"ds-input\" type=\"text\" placeholder=\"Nome completo\" /></label>",
+      "css": ".ds-field { display: grid; gap: 6px; color: #20242b; font: 700 12px Inter, 'Segoe UI', Arial, sans-serif; } .ds-input { min-height: 44px; padding: 11px 12px; border: 1px solid #c9d0d8; border-radius: 9px; background: #fff; color: #20242b; font: 400 14px Inter, 'Segoe UI', Arial, sans-serif; } .ds-input:focus-visible { outline: 0; border-color: var(--brand, #b70d18); box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+    },
+    {
+      "name": "Aba ativa",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "Indica a área atual da operação dentro da navegação persistente.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Áreas\"><button class=\"ds-tab\" type=\"button\" aria-selected=\"true\">Novo documento</button><button class=\"ds-tab\" type=\"button\" aria-selected=\"false\">Histórico</button></nav>",
+      "css": ".ds-tabs { display: flex; gap: 5px; padding: 5px; border: 1px solid #dde2e8; border-radius: 15px; background: rgba(255, 255, 255, 0.94); } .ds-tab { min-height: 44px; padding: 9px 15px; border: 0; border-radius: 10px; background: transparent; color: #5f6874; font: 800 12.5px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-tab:hover { background: #f3f4f6; } .ds-tab[aria-selected='true'] { background: var(--brand, #b70d18); color: #fff; box-shadow: 0 5px 14px rgba(183, 13, 24, 0.2); } .ds-tab:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+    },
+    {
+      "name": "Cartão de conteúdo",
+      "kind": "card",
+      "refersTo": "content-card",
+      "description": "Agrupa histórico, cadastros, modelos e segurança como superfícies de trabalho.",
+      "html": "<section class=\"ds-card\"><h3>Histórico de documentos</h3><p>Consulte e filtre emissões registradas localmente.</p></section>",
+      "css": ".ds-card { padding: clamp(18px, 2.5vw, 28px); border: 1px solid #dde2e8; border-radius: 20px; background: #fff; color: #20242b; box-shadow: 0 12px 32px rgba(22, 29, 37, 0.08); font: 400 14px/1.45 Inter, 'Segoe UI', Arial, sans-serif; } .ds-card h3 { margin: 0 0 4px; font-size: 18px; } .ds-card p { margin: 0; color: #68717d; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Gestão de documentos e contratos",
+    "overview": "Este é um sistema de operação para trabalho imobiliário recorrente: sóbrio, preciso e confiável. A interface reduz a burocracia visual para que a atenção do operador permaneça nos dados, na situação do documento e na ação de emissão.\n\nSuperfícies claras, bordas calmas e profundidade moderada organizam informação densa sem transformar a aplicação em um painel técnico confuso. O Vermelho Institucional dá autoridade às decisões relevantes; o Azul de Informação atende dados e orientações rotineiras. A forma deve reforçar clareza, nunca competir com o documento em si.",
+    "keyCharacteristics": [
+      "Hierarquia funcional orientada à emissão, consulta e validação.",
+      "Contraste alto, texto legível e estados perceptíveis para leitores de tela e operação assistida.",
+      "Camadas claras, cantos suavemente arredondados e sombras contidas.",
+      "Cor de destaque usada com disciplina, não como decoração."
+    ],
+    "rules": [
+      {
+        "name": "The Accent Has Authority Rule",
+        "body": "O Vermelho Institucional é reservado a ações principais, seleção ativa, obrigatoriedade e alertas. Informação de rotina usa o Azul de Informação; o restante da tela permanece neutro.",
+        "section": "colors"
+      },
+      {
+        "name": "The Label-First Rule",
+        "body": "Nenhum campo depende de placeholder, cor ou posição para explicar seu propósito; o rótulo nomeia o dado antes da entrada.",
+        "section": "typography"
+      },
+      {
+        "name": "The Quiet Layers Rule",
+        "body": "Use profundidade para esclarecer relações de contexto, não para ornamentar cada bloco de conteúdo.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do mantenha o Vermelho Institucional para ação principal, seleção ativa, obrigatoriedade e alerta.",
+      "Do use o Azul de Informação para mensagens rotineiras e orientação contextual, após implementar o token e verificar contraste.",
+      "Do associe rótulos, ajuda, erro e foco ao campo correspondente; o estado deve ser entendido sem depender apenas de cor.",
+      "Do preserve o fluxo formulário → prévia A4 → confirmação → emissão, com ações críticas sempre alcançáveis.",
+      "Do adapte a estrutura para uma coluna e uma prévia dedicada no celular, mantendo controles de toque e leitura confortáveis."
+    ],
+    "donts": [
+      "Don't usar o vermelho como preenchimento decorativo ou sinalizar prioridades concorrentes na mesma tela.",
+      "Don't adicionar ornamentos, gradientes vistosos, sombras pesadas ou superfícies que façam o produto parecer promocional.",
+      "Don't criar aparência de painel técnico confuso com cartões redundantes, filtros sem agrupamento ou informação operacional sem hierarquia.",
+      "Don't reduzir contraste, tamanho de toque, foco visível ou mensagens de erro por razões estéticas."
+    ]
+  }
+}

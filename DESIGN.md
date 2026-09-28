@@ -1,0 +1,208 @@
+---
+name: Paraíba Imóveis
+description: Sistema de interface sóbrio e preciso para gestão local de documentos e contratos.
+colors:
+  primary: "#b70d18"
+  primary-dark: "#8f0710"
+  primary-soft: "#fff1f2"
+  routine-info: "#57C4E5"
+  surface: "#fff"
+  surface-muted: "#f7f8fa"
+  canvas: "#eef1f5"
+  border: "#dde2e8"
+  border-strong: "#c9d0d8"
+  text: "#20242b"
+  muted: "#68717d"
+  success: "#237a43"
+  warning: "#8a6116"
+  danger: "#b42318"
+typography:
+  display:
+    fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
+    fontSize: "clamp(20px, 2vw, 26px)"
+    fontWeight: 700
+  body:
+    fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
+    lineHeight: 1.45
+  label:
+    fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
+    fontSize: "12px"
+    fontWeight: 700
+rounded:
+  field: "9px"
+  button: "10px"
+  tab: "10px"
+  section: "12px"
+  card: "20px"
+spacing:
+  tight: "8px"
+  field: "13px"
+  panel: "18px"
+  section: "22px"
+components:
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.surface}"
+    rounded: "{rounded.button}"
+    padding: "12px 14px"
+    height: "44px"
+  button-secondary:
+    backgroundColor: "#eef1f4"
+    textColor: "{colors.text}"
+    rounded: "{rounded.button}"
+    padding: "12px 14px"
+    height: "44px"
+  field-input:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.field}"
+    padding: "11px 12px"
+    height: "44px"
+  tab-active:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.surface}"
+    rounded: "{rounded.tab}"
+    padding: "9px 15px"
+    height: "44px"
+---
+
+# Design System: Paraíba Imóveis
+
+## Overview
+
+**Creative North Star: "Gestão de documentos e contratos"**
+
+Este é um sistema de operação para trabalho imobiliário recorrente: sóbrio, preciso e confiável. A interface reduz a burocracia visual para que a atenção do operador permaneça nos dados, na situação do documento e na ação de emissão.
+
+Superfícies claras, bordas calmas e profundidade moderada organizam informação densa sem transformar a aplicação em um painel técnico confuso. O Vermelho Institucional dá autoridade às decisões relevantes; o Azul de Informação atende dados e orientações rotineiras. A forma deve reforçar clareza, nunca competir com o documento em si.
+
+**Key Characteristics:**
+
+- Hierarquia funcional orientada à emissão, consulta e validação.
+- Contraste alto, texto legível e estados perceptíveis para leitores de tela e operação assistida.
+- Camadas claras, cantos suavemente arredondados e sombras contidas.
+- Cor de destaque usada com disciplina, não como decoração.
+
+## Colors
+
+A paleta é predominantemente neutra, com cor aplicada para prioridade, orientação e estado — nunca para enfeite.
+
+### Primary
+
+- **Vermelho Institucional** (`{colors.primary}`): ações primárias, seleção ativa, obrigatoriedade e estados que pedem atenção imediata.
+- **Vermelho Profundo** (`{colors.primary-dark}`): resposta de interação para a ação primária.
+- **Vermelho Suave** (`{colors.primary-soft}`): contexto de apoio para o acento institucional, sem disputar atenção com o conteúdo.
+
+### Secondary
+
+- **Azul de Informação** (`{colors.routine-info}`): informações rotineiras, orientação contextual e indicadores que não exigem ação imediata. É uma decisão de sistema confirmada para as próximas implementações; introduza-o no CSS com teste de contraste quando esse uso for construído.
+
+### Neutral
+
+- **Papel Operacional** (`{colors.surface}`) e **Superfície Suave** (`{colors.surface-muted}`): áreas de leitura, formulários e cartões.
+- **Tela Fria** (`{colors.canvas}`): fundo que separa a área de trabalho das superfícies de conteúdo.
+- **Grafite de Leitura** (`{colors.text}`), **Texto de Apoio** (`{colors.muted}`) e os tons de borda: hierarquia textual e delimitação sem ruído.
+
+### Status feedback
+
+- **Sucesso**, **Aviso** e **Perigo** devem comunicar resultado operacional de forma explícita e sempre acompanhada de texto.
+
+**The Accent Has Authority Rule.** O Vermelho Institucional é reservado a ações principais, seleção ativa, obrigatoriedade e alertas. Informação de rotina usa o Azul de Informação; o restante da tela permanece neutro.
+
+## Typography
+
+**Display Font:** Inter (com Segoe UI e Arial como fallback)
+
+**Body Font:** Inter (com Segoe UI e Arial como fallback)
+
+**Character:** Uma sans-serif funcional, compacta e de alta legibilidade sustenta longas rotinas de preenchimento. Pesos fortes distinguem rótulos, números e ações sem exigir tipografia ornamental.
+
+### Hierarchy
+
+- **Display** (`{typography.display.fontWeight}`, `{typography.display.fontSize}`): títulos de áreas e contextos de trabalho.
+- **Body** (line-height de `{typography.body.lineHeight}`): instruções, conteúdo de documento e informação operacional.
+- **Label** (`{typography.label.fontWeight}`, `{typography.label.fontSize}`): rótulos curtos e inequívocos antes de cada controle.
+
+**The Label-First Rule.** Nenhum campo depende de placeholder, cor ou posição para explicar seu propósito; o rótulo nomeia o dado antes da entrada.
+
+## Layout
+
+No desktop, a área de emissão trabalha em duas colunas: formulário de largura controlada e prévia A4 persistente. Cabeçalho e navegação ficam acessíveis enquanto o operador percorre um formulário longo; cartões de conteúdo sustentam as áreas de histórico, cadastros, modelos e segurança.
+
+O ritmo usa pequenos agrupamentos para campos relacionados e espaços maiores entre seções. Em larguras intermediárias, grades e filtros se reduzem progressivamente. A partir de 767px, o formulário passa a uma coluna, a prévia abre em uma camada própria de tela inteira e as ações de emissão permanecem fixas e alcançáveis no rodapé. A impressão remove o chrome da aplicação e preserva a página A4 como superfície documental autônoma.
+
+## Elevation & Depth
+
+O sistema é levemente em camadas, não flutuante. Cartões, painel do formulário e prévia usam sombra difusa para separar contextos sobre uma tela fria; menus e a folha A4 recebem elevação um pouco maior apenas quando precisam se sobrepor ou representar um objeto físico.
+
+### Shadow Vocabulary
+
+- **UI baixa** (`0 12px 32px rgba(22, 29, 37, 0.08)`): cartões e painéis persistentes.
+- **Prévia de documento** (`0 16px 38px rgba(27, 34, 43, 0.18)`): folha A4 no espaço de trabalho.
+- **Menu contextual** (`0 16px 32px rgba(22, 29, 37, 0.16)`): ação transitória acima da lista.
+
+**The Quiet Layers Rule.** Use profundidade para esclarecer relações de contexto, não para ornamentar cada bloco de conteúdo.
+
+## Shapes
+
+Os cantos são suavemente arredondados: campos e abas compactos, seções intermediárias e cartões mais generosos. Bordas cinza claras fazem a maior parte da separação; a forma permanece estável e profissional, sem cápsulas excessivas ou geometrias chamativas.
+
+O foco visível é uma auréola institucional de três pixels. Controles mantêm altura útil de pelo menos 44px, preservando toque e navegação por teclado em todas as superfícies interativas.
+
+## Components
+
+### Buttons
+
+**Character:** ações firmes, legíveis e proporcionais à consequência.
+
+- **Shape:** canto suavemente arredondado (`{rounded.button}`) e altura mínima de `{components.button-primary.height}`.
+- **Primary:** fundo e texto definidos por `{components.button-primary.backgroundColor}` e `{components.button-primary.textColor}`; emitir, confirmar e criar ficam nesse nível.
+- **Hover / Focus:** o hover escurece a ação principal; foco visível preserva a auréola institucional e não pode depender apenas de mudança de cor.
+- **Secondary / Quiet / Danger:** secundário tem fundo cinza claro; quiet usa superfície com borda; danger usa a cor semântica apenas para operações destrutivas.
+
+### Cards / Containers
+
+**Character:** superfícies de trabalho estruturadas, não blocos promocionais.
+
+- **Corner Style:** cartões usam `{rounded.card}`; seções internas usam `{rounded.section}`.
+- **Background:** papel operacional sobre tela fria, com borda neutra e sombra baixa.
+- **Internal Padding:** espaçamento adaptável no cartão, com ritmo de `{spacing.panel}` nos painéis de formulário.
+
+### Inputs / Fields
+
+**Character:** entradas diretas, com contexto e validação próximos do dado.
+
+- **Style:** superfície clara, borda forte, canto `{rounded.field}` e altura `{components.field-input.height}`.
+- **Focus:** borda institucional e auréola visível.
+- **Error / Disabled:** erro combina cor, texto associado e `aria-invalid`; estado desabilitado não deve esconder a razão nem bloquear a leitura pelo leitor de tela.
+
+### Navigation
+
+**Character:** área de trabalho persistente, com seleção inequívoca.
+
+- **Style:** barra de abas clara e levemente translúcida; aba ativa segue `{components.tab-active}`.
+- **Mobile treatment:** a navegação pode rolar horizontalmente; o menu compacto preserva acesso às áreas sem reduzir os controles abaixo da altura útil.
+
+### Document Preview
+
+**Character:** uma folha documental real dentro de um ambiente de operação.
+
+- **Desktop:** a prévia A4 se mantém próxima ao formulário para validação contínua.
+- **Mobile and print:** no celular, abre como camada própria; na impressão, torna-se a única superfície visível.
+
+## Do's and Don'ts
+
+### Do:
+
+- **Do** mantenha o Vermelho Institucional para ação principal, seleção ativa, obrigatoriedade e alerta.
+- **Do** use o Azul de Informação para mensagens rotineiras e orientação contextual, após implementar o token e verificar contraste.
+- **Do** associe rótulos, ajuda, erro e foco ao campo correspondente; o estado deve ser entendido sem depender apenas de cor.
+- **Do** preserve o fluxo formulário → prévia A4 → confirmação → emissão, com ações críticas sempre alcançáveis.
+- **Do** adapte a estrutura para uma coluna e uma prévia dedicada no celular, mantendo controles de toque e leitura confortáveis.
+
+### Don't:
+
+- **Don't** usar o vermelho como preenchimento decorativo ou sinalizar prioridades concorrentes na mesma tela.
+- **Don't** adicionar ornamentos, gradientes vistosos, sombras pesadas ou superfícies que façam o produto parecer promocional.
+- **Don't** criar aparência de painel técnico confuso com cartões redundantes, filtros sem agrupamento ou informação operacional sem hierarquia.
+- **Don't** reduzir contraste, tamanho de toque, foco visível ou mensagens de erro por razões estéticas.
