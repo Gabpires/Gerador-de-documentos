@@ -56,7 +56,7 @@
   function read() {
     try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : emptyState(); } catch { return null; }
   }
-  function write(state, management) {
+  function write(state, management, { quiet = false } = {}) {
     if (!state) return false;
     state.management = managementOf({ management });
     try {
@@ -64,7 +64,7 @@
       window.dispatchEvent(new StorageEvent('storage', { key: KEY, newValue: JSON.stringify(state), storageArea: localStorage }));
       return true;
     } catch {
-      alert('Não foi possível salvar as informações de gestão neste navegador.');
+      if (!quiet) alert('Não foi possível salvar as informações de gestão neste navegador.');
       return false;
     }
   }
@@ -248,39 +248,94 @@
     });
     if (!$('batchReference').value) $('batchReference').value = month();
   }
-  function validateBatch() {
-    const state = read(); if (!state) return;
-    const management = managementOf(state), reference = $('batchReference').value, operator = $('batchOperator').value;
-    const chosen = [...document.querySelectorAll('#batchDossierList input:checked')].map(input => input.value);
-    batchRows = chosen.map(targetId => {
-      const item = findDossier(state, management, targetId); const latest = docsForDossier(state, management, targetId).filter(record => record.type === 'receipt').sort((a, b) => text(b.reference).localeCompare(text(a.reference)))[0];
+  function selectedBatchIds() { return [...document.querySelectorAll('#batchDossierList input:checked')].map(input => input.value); }
+  function batchCandidates(state, management) {
+    const reference = $('batchReference').value, operator = $('batchOperator').value;
+    return selectedBatchIds().map(targetId => {
+      const item = findDossier(state, management, targetId);
+      if (!item) return { dossierId: targetId, property: 'Dossiê indisponível', error: 'O dossiê foi alterado ou removido.' };
+      const latest = docsForDossier(state, management, targetId).filter(record => record.type === 'receipt').sort((a, b) => text(b.reference).localeCompare(text(a.reference)))[0];
       const amount = Number(item.amount || (latest && latest.amount) || 0);
       const record = { dossierId: targetId, tenant: item.tenant, cpf: item.tenantDocument, property: item.property, contractCode: item.contractCode || '', dueDay: Number(item.dueDay) || 0, amount, reference, payment: item.payment || (latest && latest.payment) || 'Dinheiro', receiptDate: today(), operator };
-      record.error = !reference ? 'Informe a competência.' : !record.tenant || !record.cpf || !record.property || amount <= 0 ? 'Complete nome, documento, imóvel e valor no dossiê.' : '';
+      const validation = window.paraibaDocumentApp?.validateReceipt({ ...record, number: '01/' + record.receiptDate.slice(0, 4), year: Number(record.receiptDate.slice(0, 4)) }) || {};
+      record.error = !reference ? 'Informe a competência.' : Object.values(validation)[0] || '';
       return record;
     });
+  }
+  function renderBatchValidation() {
     const box = $('batchPreview'); box.replaceChildren();
     if (!batchRows.length) box.appendChild(empty('Selecione pelo menos um dossiê para validar.'));
     batchRows.forEach(item => { const line = row(item.property, item.error ? `Exceção: ${item.error}` : `${item.tenant} · ${money(item.amount)}`); line.classList.toggle('error-row', Boolean(item.error)); box.appendChild(line); });
     $('issueBatchBtn').disabled = !batchRows.length || batchRows.some(item => item.error);
   }
-  function issueBatch() {
-    if (!batchRows.length || batchRows.some(item => item.error)) return;
-    if (!confirm(`Emitir ${batchRows.length} recibo(s)? A numeração será reservada somente agora.`)) return;
-    const state = read(); if (!state) return; const management = managementOf(state);
-    const year = Number(batchRows[0].receiptDate.slice(0, 4));
-    const used = (state.history || []).filter(record => text(record.number).endsWith(`/${year}`)).map(record => Number(text(record.number).split('/')[0])).filter(Number.isFinite);
+  function validateBatch() {
+    const state = read(); if (!state) return;
+    batchRows = batchCandidates(state, managementOf(state));
+    renderBatchValidation();
+  }
+  function batchNumbering(state, rows) {
+    const year = Number(rows[0].receiptDate.slice(0, 4));
+    const used = [...(state.history || []), ...(state.documents || []).filter(record => record.type === 'receipt')].filter(record => text(record.number).endsWith(`/${year}`)).map(record => Number(text(record.number).split('/')[0])).filter(Number.isFinite);
     let sequence = Math.max(Number((state.counters || {})[year]) || 1, ...used.map(number => number + 1), 1);
-    const created = batchRows.map(item => {
-      const number = `${String(sequence++).padStart(2, '0')}/${year}`;
-      const record = { ...item, number, year, type: 'receipt', templateVersion: 1, letterhead: 'institutional', fields: { ...item, number, year }, status: 'issued', createdAt: now(), issuedOn: state.meta && state.meta.installationId || '', printCount: 0, lastPrintedAt: '' };
+    const numbers = rows.map(() => `${String(sequence++).padStart(2, '0')}/${year}`);
+    return { year, numbers, nextSequence: sequence };
+  }
+  function batchFingerprint(rows) { return JSON.stringify(rows.map(({ error, ...item }) => item)); }
+  function commitBatch(state, management, rows, numbering) {
+    const created = rows.map((item, index) => {
+      const number = numbering.numbers[index];
+      const { error, ...data } = item;
+      const record = { ...data, number, year: numbering.year, type: 'receipt', templateVersion: 1, letterhead: 'institutional', fields: { ...data, number, year: numbering.year }, status: 'issued', createdAt: now(), issuedOn: state.meta && state.meta.installationId || '', printCount: 0, lastPrintedAt: '' };
       const recordId = `receipt:${number}`;
       management.recordMeta[recordId] = { ...(management.recordMeta[recordId] || {}), dossierId: item.dossierId, tags: [] };
       audit(management, { action: 'emitido em lote', recordId, dossierId: item.dossierId, number, actor: item.operator, detail: `Competência ${item.reference}` });
       return record;
     });
-    state.history = [...(state.history || []), ...created]; state.counters = { ...(state.counters || {}), [year]: sequence }; state.meta = { ...(state.meta || {}), defaultOperator: batchRows[0].operator };
-    if (write(state, management)) { batchRows = []; $('batchPreview').replaceChildren(); $('issueBatchBtn').disabled = true; renderDashboard(); alert(`${created.length} recibo(s) emitido(s) e registrados.`); }
+    state.history = [...(state.history || []), ...created]; state.counters = { ...(state.counters || {}), [numbering.year]: numbering.nextSequence }; state.meta = { ...(state.meta || {}), defaultOperator: rows[0].operator };
+    if (!write(state, management, { quiet: true })) throw new Error('Não foi possível registrar o lote neste navegador. Nenhum recibo foi emitido; revise o armazenamento e tente novamente.');
+    return created;
+  }
+  function issueBatch() {
+    if (!batchRows.length || batchRows.some(item => item.error)) return;
+    const state = read(); if (!state) return;
+    const management = managementOf(state), reviewedRows = batchCandidates(state, management);
+    if (!reviewedRows.length || reviewedRows.some(item => item.error)) { batchRows = reviewedRows; renderBatchValidation(); return; }
+    const reviewedFingerprint = batchFingerprint(reviewedRows), numbering = batchNumbering(state, reviewedRows);
+    const firstNumber = numbering.numbers[0], lastNumber = numbering.numbers[numbering.numbers.length - 1];
+    const requestReview = window.paraibaDocumentApp?.requestIssueReview;
+    if (typeof requestReview !== 'function') return;
+    requestReview({
+      title: `Revisar emissão de ${reviewedRows.length} recibo${reviewedRows.length === 1 ? '' : 's'}`,
+      description: 'Confira a competência, a numeração proposta e todos os dossiês. O lote inteiro será registrado de uma só vez.',
+      confirmLabel: `Emitir e registrar ${reviewedRows.length}`,
+      fields: [
+        { label: 'Documento', value: 'Recibos em lote' },
+        { label: 'Quantidade', value: String(reviewedRows.length) },
+        { label: 'Competência', value: reviewedRows[0].reference },
+        { label: 'Data de emissão', value: date(reviewedRows[0].receiptDate) },
+        { label: 'Números propostos', value: firstNumber === lastNumber ? firstNumber : `${firstNumber} a ${lastNumber}` },
+        { label: 'Responsável', value: reviewedRows[0].operator },
+        { label: 'Partes e imóveis', value: reviewedRows.map(item => `${item.tenant} — ${item.property} · ${money(item.amount)}`) }
+      ],
+      consequence: `Os ${reviewedRows.length} números serão reservados juntos somente ao emitir. Se um item falhar, nenhum recibo será registrado.`,
+      validate: () => {
+        const currentState = read(); if (!currentState) return { ok: false, message: 'Os dados locais não puderam ser lidos. Volte e valide o lote novamente.' };
+        const currentRows = batchCandidates(currentState, managementOf(currentState));
+        if (currentRows.some(item => item.error)) return { ok: false, rows: currentRows, message: 'Um ou mais itens deixaram de ser válidos. Corrija os dossiês e valide o lote novamente.' };
+        const currentNumbering = batchNumbering(currentState, currentRows);
+        if (batchFingerprint(currentRows) !== reviewedFingerprint || JSON.stringify(currentNumbering.numbers) !== JSON.stringify(numbering.numbers)) return { ok: false, rows: currentRows, message: 'Os dados ou a numeração do lote mudaram. Valide e revise o lote novamente.' };
+        return { ok: true };
+      },
+      onInvalid: result => { if (result.rows) { batchRows = result.rows; renderBatchValidation(); } window.paraibaDocumentApp?.notify(result.message || 'Valide o lote novamente.', true); },
+      commit: () => {
+        const currentState = read();
+        return commitBatch(currentState, managementOf(currentState), reviewedRows, numbering);
+      },
+      onSuccess: created => {
+        batchRows = []; $('batchPreview').replaceChildren(); $('issueBatchBtn').disabled = true; renderDashboard();
+        window.paraibaDocumentApp?.notify(`${created.length} recibo(s) emitido(s) e registrados.`);
+      }
+    });
   }
 
   function readAdvanced() { return { query: clean($('advancedSearch').value), property: clean($('advancedProperty').value), from: $('advancedFrom').value, to: $('advancedTo').value, status: $('advancedStatus').value, signature: $('advancedSignature').value, operator: $('advancedOperator').value, tag: normal($('advancedTag').value) }; }

@@ -24,6 +24,8 @@
   let state = lerEstado();
   let activeRecord = null;
   let pendingIssue = null;
+  let activeIssueReview = null;
+  let issueReviewSubmitting = false;
   let cancelTargetNumber = null;
   let historyPage = 1;
   let draftDirty = false;
@@ -206,11 +208,12 @@
   const nro = (ano, seq) => String(seq).padStart(2, '0') + '/' + ano;
   function proxSeq(ano) {
     const k = String(ano);
-    const usados = state.history.filter(r => typeof r.number === 'string' && r.number.endsWith('/' + k))
+    const usados = [...state.history, ...state.documents.filter(r => r.type === 'receipt')].filter(r => typeof r.number === 'string' && r.number.endsWith('/' + k))
       .map(r => Number(r.number.split('/')[0])).filter(Number.isInteger);
     const definido = Number(state.counters[k]);
     return Math.max(1, Number.isInteger(definido) ? definido : 1, Math.max(0, ...usados) + 1);
   }
+  function numeroDocumentoEmUso(number) { return state.history.some(record => record.number === number) || state.documents.some(record => record.number === number); }
   const nroAtivo = () => activeRecord ? activeRecord.number : nro(anoSel(), proxSeq(anoSel()));
 
   function parseValor(v) {
@@ -939,7 +942,58 @@
   }
   function travarDocumentoGenerico(travado) { camposGenericosElementos().forEach(el => el.disabled = travado); document.querySelectorAll('[data-clause]').forEach(el => el.disabled = travado); $('docQuickContact').disabled = travado; $('docTemplate').disabled = travado; }
   function salvarRascunhoGenerico() { if (storageCorrupted) { toast('Resolva a recuperação dos dados antes de salvar.', true); return; } const base = dadosDocumentoGenerico(), agora = new Date().toISOString(), registro = normalizarDocumentoGenerico({ ...base, id: editingGenericDraftId || base.id, status: 'draft', updatedAt: agora, createdAt: agora }, { draft: true }); let drafts = state.draftDocuments.filter(x => x.id !== registro.id); drafts.push(registro); if (!persistir({ ...state, draftDocuments: drafts })) return; editingGenericDraftId = registro.id; genericDirty = false; renderHistorico(); atualizarVisaoSeguranca(); atualizarDocumentoGenerico(); toast('Rascunho de ' + rotuloTipo(registro.type).toLowerCase() + ' salvo.'); }
-  function emitirDocumentoGenerico() { if (activeGenericRecord || storageCorrupted) return; state = lerEstado(); const d = dadosDocumentoGenerico(), erros = validarDocumentoGenerico(d); if (!mostrarErrosGenericos(erros)) { toast('Confira os campos indicados antes de emitir.', true); return; } d.number = numeroDocumento(d.type, d.fields.docDate); d.year = Number(d.fields.docDate.slice(0, 4)); if (!confirm('Emitir ' + rotuloTipo(d.type).toLowerCase() + ' ' + d.number + ' com o título “' + d.fields.docTitle + '”?')) return; if (state.documents.some(x => x.number === d.number)) { atualizarDocumentoGenerico(); toast('A numeração foi atualizada. Confira e tente novamente.', true); return; } const agora = new Date().toISOString(), registro = normalizarDocumentoGenerico({ ...d, status: 'issued', createdAt: agora, updatedAt: agora, printCount: 0, lastPrintedAt: '' }); const chave = chaveContadorDocumento(d.type, d.year), seq = proximaSequenciaDocumento(d.type, d.year), documents = [...state.documents, registro], draftDocuments = state.draftDocuments.filter(x => x.id !== editingGenericDraftId); if (!persistir({ ...state, documents, draftDocuments, documentCounters: { ...state.documentCounters, [chave]: seq + 1 }, meta: { ...state.meta, defaultOperator: d.operator } })) return; activeGenericRecord = Object.freeze({ ...registro }); editingGenericDraftId = ''; genericDirty = false; travarDocumentoGenerico(true); renderHistorico(); atualizarVisaoSeguranca(); atualizarDocumentoGenerico(); toast(rotuloTipo(d.type) + ' ' + d.number + ' emitido e registrado.'); }
+  function assinaturaDocumentoGenerico(d) { return JSON.stringify({ type: d.type, templateId: d.templateId, number: d.number, year: d.year, fields: d.fields, operator: d.operator }); }
+  function partesDocumentoGenerico(d) {
+    const f = d.fields, party = (name, document) => String(name || '').trim() + (document ? ' — ' + document : '');
+    if (d.type === 'declaration') return [party(f.docDeclarant, f.docDeclarantDocument)];
+    if (d.type === 'term') return [party(f.docPartyOne, f.docPartyOneDocument), party(f.docPartyTwo, f.docPartyTwoDocument)].filter(Boolean);
+    const subtype = f.docContractSubtype || 'lease';
+    if (subtype === 'sale') return [f.docSeller, f.docBuyer].filter(Boolean);
+    if (subtype === 'management') return [f.docLandlord, 'S.A. Paraíba Imóveis J.R. Ltda.'].filter(Boolean);
+    return [f.docLandlord, f.docTenantParty].filter(Boolean);
+  }
+  function assuntoDocumentoGenerico(d) { return d.type === 'declaration' ? d.fields.docSubject : d.type === 'term' ? d.fields.docProperty : d.fields.docContractProperty; }
+  function confirmarDocumentoGenerico(d) {
+    const agora = new Date().toISOString(), registro = normalizarDocumentoGenerico({ ...d, status: 'issued', createdAt: agora, updatedAt: agora, printCount: 0, lastPrintedAt: '' });
+    const chave = chaveContadorDocumento(d.type, d.year), seq = proximaSequenciaDocumento(d.type, d.year), documents = [...state.documents, registro], draftDocuments = state.draftDocuments.filter(x => x.id !== editingGenericDraftId);
+    if (!persistir({ ...state, documents, draftDocuments, documentCounters: { ...state.documentCounters, [chave]: seq + 1 }, meta: { ...state.meta, defaultOperator: d.operator } })) return false;
+    activeGenericRecord = Object.freeze({ ...registro }); editingGenericDraftId = ''; genericDirty = false; travarDocumentoGenerico(true); renderHistorico(); atualizarVisaoSeguranca(); atualizarDocumentoGenerico(); toast(rotuloTipo(d.type) + ' ' + d.number + ' emitido e registrado.');
+    return registro;
+  }
+  function emitirDocumentoGenerico() {
+    if (activeGenericRecord || storageCorrupted) return;
+    state = lerEstado();
+    const d = dadosDocumentoGenerico(), erros = validarDocumentoGenerico(d);
+    if (!mostrarErrosGenericos(erros)) { toast('Confira os campos indicados antes de emitir.', true); return; }
+    d.number = numeroDocumento(d.type, d.fields.docDate); d.year = Number(d.fields.docDate.slice(0, 4));
+    if (numeroDocumentoEmUso(d.number)) { atualizarDocumentoGenerico(); toast('A numeração foi atualizada. Confira e tente novamente.', true); return; }
+    const reviewedSignature = assinaturaDocumentoGenerico(d), selectedTemplate = $('docTemplate').selectedOptions[0];
+    solicitarRevisaoEmissao({
+      title: 'Revisar emissão de ' + rotuloTipo(d.type).toLowerCase(),
+      description: 'Confira documento, partes, assunto e responsável antes de criar o registro definitivo.',
+      fields: [
+        { label: 'Documento', value: rotuloTipo(d.type) + ' · ' + d.fields.docTitle },
+        { label: 'Modelo', value: selectedTemplate ? selectedTemplate.textContent : 'Modelo padrão' },
+        { label: 'Número proposto', value: d.number },
+        { label: 'Partes', value: partesDocumentoGenerico(d) },
+        { label: d.type === 'declaration' ? 'Assunto' : 'Imóvel ou objeto', value: assuntoDocumentoGenerico(d) },
+        { label: 'Data', value: dataLonga(d.fields.docDate) },
+        ...(d.fields.docContractValue ? [{ label: 'Valor', value: 'R$ ' + d.fields.docContractValue }] : []),
+        { label: 'Responsável', value: d.operator }
+      ],
+      consequence: 'O número será reservado somente ao emitir. O conteúdo ficará travado e preservado no histórico.',
+      validate: () => {
+        state = lerEstado();
+        const current = dadosDocumentoGenerico(); current.number = numeroDocumento(current.type, current.fields.docDate); current.year = Number(current.fields.docDate.slice(0, 4));
+        const currentErrors = validarDocumentoGenerico(current);
+        if (Object.keys(currentErrors).length) return { ok: false, errors: currentErrors, message: 'Os dados deixaram de ser válidos. Confira os campos indicados.' };
+        if (assinaturaDocumentoGenerico(current) !== reviewedSignature || numeroDocumentoEmUso(d.number)) return { ok: false, stale: true, message: 'Os dados ou a numeração mudaram. Abra uma nova revisão antes de emitir.' };
+        return { ok: true };
+      },
+      onInvalid: result => { if (result.errors) mostrarErrosGenericos(result.errors); atualizarDocumentoGenerico(); toast(result.message || 'Confira os dados e abra a revisão novamente.', true); },
+      commit: () => confirmarDocumentoGenerico(d)
+    });
+  }
   function carregarDocumentoGenerico(r, { duplicar = false } = {}) { if (!r) return false; currentDocumentType = r.type; selecionarTipoDocumento(r.type, { ignorarConfirmacao: true }); activeGenericRecord = duplicar || r.status === 'draft' ? null : Object.freeze({ ...r }); editingGenericDraftId = r.status === 'draft' && !duplicar ? r.id : ''; preencherCamposGenericos({ ...r.fields, docDate: duplicar ? hoje() : r.fields.docDate }); if (duplicar) { editingGenericDraftId = ''; genericDirty = true; } else genericDirty = false; travarDocumentoGenerico(!!activeGenericRecord); ativarView('new'); atualizarDocumentoGenerico(); toast(duplicar ? 'Documento duplicado como novo rascunho.' : (r.status === 'draft' ? 'Rascunho carregado para edição.' : rotuloTipo(r.type) + ' ' + r.number + ' carregado.')); return true; }
   function duplicarDocumentoGenerico() { if (activeGenericRecord) carregarDocumentoGenerico(activeGenericRecord, { duplicar: true }); }
   function cancelarDocumentoGenerico(id) { state = lerEstado(); const r = state.documents.find(x => x.id === id); if (!r || r.status === 'canceled') return; const motivo = prompt('Informe o motivo do cancelamento de ' + r.number + ':'); if (motivo === null) return; if (motivo.trim().length < 3) { toast('Informe um motivo com pelo menos 3 caracteres.', true); return; } const agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'canceled', cancelReason: motivo.trim(), canceledAt: agora, canceledBy: state.meta.defaultOperator || operadores[0], updatedAt: agora } : x); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(x => x.id === id) }); renderHistorico(); atualizarDocumentoGenerico(); toast('Documento cancelado e preservado no histórico.'); }
@@ -1029,6 +1083,86 @@
     if ($('confirmModal').hidden && $('cancelModal').hidden) { document.body.style.overflow = ''; if (lastModalTrigger && document.contains(lastModalTrigger)) lastModalTrigger.focus(); lastModalTrigger = null; }
   }
   function manterFocoNoModal(evento) { if (evento.key !== 'Tab') return; const modal = !$('confirmModal').hidden ? $('confirmModal') : !$('cancelModal').hidden ? $('cancelModal') : null; if (!modal) return; const focaveis = [...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el => el.offsetParent !== null); if (!focaveis.length) return; const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1]; if (evento.shiftKey && document.activeElement === primeiro) { evento.preventDefault(); ultimo.focus(); } else if (!evento.shiftKey && document.activeElement === ultimo) { evento.preventDefault(); primeiro.focus(); } }
+  function valorRevisao(value) {
+    if (Array.isArray(value)) return value.filter(Boolean).join('\n');
+    const text = String(value ?? '').trim();
+    return text || '—';
+  }
+  function renderizarCamposRevisao(fields) {
+    const list = $('confirmFields');
+    list.replaceChildren();
+    (Array.isArray(fields) ? fields : []).forEach(field => {
+      const term = document.createElement('dt'), description = document.createElement('dd');
+      term.textContent = String(field.label || 'Dado');
+      description.textContent = valorRevisao(field.value);
+      if (field.id && /^[A-Za-z][\w:-]*$/.test(field.id)) description.id = field.id;
+      list.append(term, description);
+    });
+  }
+  function erroRevisao(message = '') {
+    const box = $('confirmError');
+    box.textContent = message;
+    box.hidden = !message;
+  }
+  function encerrarRevisao(resultado = false) {
+    const review = activeIssueReview;
+    activeIssueReview = null;
+    issueReviewSubmitting = false;
+    $('confirmIssueBtn').disabled = false;
+    $('cancelIssueBtn').disabled = false;
+    $('confirmModal').querySelector('.modal-card').removeAttribute('aria-busy');
+    fecharModal('confirmModal');
+    if (review && typeof review.resolve === 'function') review.resolve(resultado);
+  }
+  function cancelarRevisao() {
+    if (!activeIssueReview || issueReviewSubmitting) return;
+    encerrarRevisao(false);
+  }
+  function solicitarRevisaoEmissao(options) {
+    if (!options || typeof options.commit !== 'function' || activeIssueReview) return Promise.resolve(false);
+    $('confirmTitle').textContent = options.title || 'Revisar emissão';
+    $('confirmDescription').textContent = options.description || 'Confira os dados críticos antes de criar o registro definitivo.';
+    $('confirmConsequence').textContent = options.consequence || 'A numeração será reservada somente ao emitir e o registro será preservado no histórico.';
+    $('confirmIssueBtn').textContent = options.confirmLabel || 'Emitir e registrar';
+    renderizarCamposRevisao(options.fields);
+    erroRevisao();
+    abrirModal('confirmModal');
+    $('confirmIssueBtn').focus();
+    return new Promise(resolve => { activeIssueReview = { ...options, resolve }; });
+  }
+  async function confirmarRevisaoEmissao() {
+    if (!activeIssueReview || issueReviewSubmitting) return;
+    const review = activeIssueReview;
+    issueReviewSubmitting = true;
+    $('confirmModal').querySelector('.modal-card').setAttribute('aria-busy', 'true');
+    $('confirmIssueBtn').disabled = true;
+    $('cancelIssueBtn').disabled = true;
+    $('confirmIssueBtn').textContent = 'Registrando…';
+    erroRevisao();
+    try {
+      const validation = typeof review.validate === 'function' ? await review.validate() : { ok: true };
+      if (validation && validation.ok === false) {
+        encerrarRevisao(false);
+        if (typeof review.onInvalid === 'function') review.onInvalid(validation);
+        return;
+      }
+      const result = await review.commit();
+      if (result === false || result == null) throw new Error('Não foi possível registrar a emissão neste navegador. Seus dados continuam na edição; tente novamente.');
+      encerrarRevisao(true);
+      if (typeof review.onSuccess === 'function') review.onSuccess(result);
+    } catch (error) {
+      erroRevisao(error && error.message ? error.message : 'Não foi possível registrar a emissão. Seus dados continuam na edição.');
+      issueReviewSubmitting = false;
+      $('confirmModal').querySelector('.modal-card').removeAttribute('aria-busy');
+      $('confirmIssueBtn').disabled = false;
+      $('cancelIssueBtn').disabled = false;
+      $('confirmIssueBtn').textContent = review.confirmLabel || 'Emitir e registrar';
+      $('confirmError').focus({ preventScroll: false });
+    }
+  }
+  function assinaturaRecibo(d) {
+    return JSON.stringify({ number: d.number, year: d.year, amount: d.amount, tenant: d.tenant, cpf: d.cpf, property: d.property, contractCode: d.contractCode, dueDay: d.dueDay, reference: d.reference, payment: d.payment, receiptDate: d.receiptDate, operator: d.operator });
+  }
   function emitir() {
     if (activeRecord) return;
     if (storageCorrupted) { toast('Resolva o aviso de recuperação antes de emitir.', true); return; }
@@ -1036,47 +1170,58 @@
     const d = dadosFormulario(), erros = validarDados(d);
     if (!mostrarErros(erros)) { toast('Confira os campos indicados antes de emitir.', true); return; }
     atualizar();
-    if (!conteudoCabeEmUmaPagina() && !confirm('O conteúdo pode ultrapassar uma página A4. Deseja continuar mesmo assim?')) return;
-    if (state.history.some(r => r.number === d.number)) {
+    if (numeroDocumentoEmUso(d.number)) {
       atualizar(); toast('A numeração foi atualizada. Confira o novo número e tente novamente.', true); return;
     }
-    pendingIssue = { ...d };
-    $('confirmNumber').textContent = d.number;
-    $('confirmTenant').textContent = d.tenant + ' — ' + tipoDocumento(d.cpf) + ' ' + d.cpf;
-    $('confirmAmount').textContent = moeda(d.amount);
-    $('confirmProperty').textContent = d.property;
-    $('confirmReference').textContent = refTexto(d.reference);
-    $('confirmPayment').textContent = d.payment;
-    $('confirmOperator').textContent = d.operator;
-    $('confirmInternal').textContent = (d.contractCode || 'Sem código') + (d.dueDay ? ' · vencimento dia ' + d.dueDay : '');
-    abrirModal('confirmModal'); $('confirmIssueBtn').focus();
+    const reviewedSignature = assinaturaRecibo(d), exceedsPage = !conteudoCabeEmUmaPagina();
+    solicitarRevisaoEmissao({
+      title: 'Revisar emissão do recibo',
+      description: 'Confira parte, imóvel, competência, valor e responsável antes de criar o registro definitivo.',
+      fields: [
+        { id: 'confirmNumber', label: 'Número proposto', value: d.number },
+        { id: 'confirmTenant', label: 'Locatário', value: d.tenant + ' — ' + tipoDocumento(d.cpf) + ' ' + d.cpf },
+        { id: 'confirmProperty', label: 'Imóvel', value: d.property },
+        { id: 'confirmReference', label: 'Competência', value: refTexto(d.reference) },
+        { id: 'confirmAmount', label: 'Valor', value: moeda(d.amount) },
+        { id: 'confirmPayment', label: 'Pagamento', value: d.payment },
+        { label: 'Data', value: dataLonga(d.receiptDate) },
+        { id: 'confirmOperator', label: 'Responsável', value: d.operator },
+        { id: 'confirmInternal', label: 'Controle interno', value: (d.contractCode || 'Sem código') + (d.dueDay ? ' · vencimento dia ' + d.dueDay : '') },
+        ...(exceedsPage ? [{ label: 'Prévia A4', value: 'O conteúdo pode ocupar mais de uma página.' }] : [])
+      ],
+      consequence: (exceedsPage ? 'A prévia pode ocupar mais de uma página. ' : '') + 'O número será reservado somente ao emitir e o recibo ficará preservado no histórico.',
+      validate: () => {
+        state = lerEstado();
+        const current = dadosFormulario(), currentErrors = validarDados(current);
+        if (Object.keys(currentErrors).length) return { ok: false, errors: currentErrors, message: 'Os dados deixaram de ser válidos. Confira os campos indicados.' };
+        if (assinaturaRecibo(current) !== reviewedSignature || numeroDocumentoEmUso(d.number)) return { ok: false, stale: true, message: 'Os dados ou a numeração mudaram. Confira a nova revisão antes de emitir.' };
+        return { ok: true };
+      },
+      onInvalid: result => {
+        if (result.errors) mostrarErros(result.errors);
+        atualizar();
+        toast(result.message || 'Confira os dados e abra a revisão novamente.', true);
+      },
+      commit: () => confirmarEmissao(d)
+    });
   }
-  function confirmarEmissao() {
-    if (!pendingIssue) return;
+  function confirmarEmissao(d) {
     state = lerEstado();
-    const d = { ...pendingIssue };
-    if (state.history.some(r => r.number === d.number)) {
-      pendingIssue = null; fecharModal('confirmModal'); atualizar();
-      toast('Outro recibo utilizou esse número. Confira a numeração atualizada.', true); return;
-    }
-    const erros = validarDados(d);
-    if (Object.keys(erros).length) {
-      pendingIssue = null; fecharModal('confirmModal'); mostrarErros(erros);
-      toast('Os dados mudaram ou deixaram de ser válidos. Confira novamente.', true); return;
-    }
     const registro = { ...d, type: 'receipt', templateVersion: 1, letterhead: 'institutional', fields: { ...d }, status: 'issued', createdAt: new Date().toISOString(), issuedOn: state.meta.installationId, printCount: 0, lastPrintedAt: '' };
     const k = String(d.year);
     const contacts = upsertContato(state.contacts, d);
     const next = {
+      ...state,
       counters: { ...state.counters, [k]: Math.max(proxSeq(d.year), Number(d.number.split('/')[0]) + 1) },
       history: [...state.history, registro], contacts,
       draft: null, management: state.management || {}, meta: { ...state.meta, defaultOperator: d.operator }
     };
-    if (!persistir(next)) return;
-    pendingIssue = null; fecharModal('confirmModal');
+    if (!persistir(next)) return false;
+    pendingIssue = null;
     activeRecord = Object.freeze({ ...registro }); draftDirty = false;
     preencherFormulario(activeRecord); travar(true); renderCadastros(); renderHistorico(); atualizar();
     toast('Recibo ' + d.number + ' emitido e registrado.');
+    return registro;
   }
   function abrirCancelamento(number) {
     const r = state.history.find(x => x.number === number);
@@ -1394,8 +1539,8 @@
   document.querySelectorAll('[data-clause]').forEach(el => el.addEventListener('change', () => { genericDirty = true; atualizarDocumentoGenerico(); }));
   document.querySelectorAll('[data-client-role]').forEach(select => select.addEventListener('change', aplicarClienteContrato));
   ['docDeclarantDocument', 'docPartyOneDocument', 'docPartyTwoDocument', 'docLandlordDocument', 'docTenantPartyDocument', 'docSellerDocument', 'docBuyerDocument', 'docWitnessOneDocument', 'docWitnessTwoDocument'].forEach(id => $(id).addEventListener('input', e => { e.target.value = mascaraDocumento(e.target.value); genericDirty = true; atualizarDocumentoGenerico(); }));
-  $('confirmIssueBtn').addEventListener('click', confirmarEmissao);
-  $('cancelIssueBtn').addEventListener('click', () => { pendingIssue = null; fecharModal('confirmModal'); $('issueBtn').focus(); });
+  $('confirmIssueBtn').addEventListener('click', confirmarRevisaoEmissao);
+  $('cancelIssueBtn').addEventListener('click', cancelarRevisao);
   $('closeCancelBtn').addEventListener('click', fecharCancelamento);
   $('confirmCancelBtn').addEventListener('click', confirmarCancelamento);
   $('cancelReason').addEventListener('input', () => {
@@ -1422,11 +1567,13 @@
     if (kind === 'receipt') return { number: nro(year, proxSeq(year)), year };
     return { number: numeroDocumento(kind, date), year };
   }
+  function identidadeDocumentoDinamico(kind, fields) { state = lerEstado(); return { ...proximoNumeroDinamico(kind, normalizarCamposGenericos(fields)), operator: state.meta.defaultOperator || operadores[0] }; }
   function salvarDocumentoDinamico(payload) {
     if (storageCorrupted || !payload || !payload.definition || !DYNAMIC_TYPES.includes(payload.definition.documentKind)) return null;
     state = lerEstado();
     const kind = payload.definition.documentKind, fields = normalizarCamposGenericos(payload.values), now = new Date().toISOString();
     const isDraft = payload.status === 'draft', id = idDocumento(), identity = proximoNumeroDinamico(kind, fields);
+    if (!isDraft && payload.expectedIdentity && (payload.expectedIdentity.number !== identity.number || Number(payload.expectedIdentity.year) !== Number(identity.year))) throw new Error('A numeração foi atualizada. Volte à edição e revise o novo número antes de emitir.');
     if (!isDraft && identity.number && (state.history.some(record => record.number === identity.number) || state.documents.some(record => record.number === identity.number))) throw new Error('A numeração foi atualizada. Emita novamente para usar o próximo número.');
     const snapshot = normalizarSnapshot({ definition: payload.definition, html: String(payload.html || ''), renderedHtml: String(payload.renderedHtml || '') });
     if (!snapshot) throw new Error('O snapshot do template é inválido.');
@@ -1440,7 +1587,16 @@
   }
   function modelosLegadosParaMigrar() { return state.templates.map(model => ({ id: String(model.id || '').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 63), name: model.name, documentKind: model.type, fields: Object.entries(model.fields || {}).filter(([, value]) => typeof value !== 'object').slice(0, 40).map(([key, value], index) => ({ id: ('campo_' + index), name: key, tag: '{{CAMPO_' + index + '}}', type: String(value).length > 120 ? 'textarea' : 'text', required: false, defaultValue: String(value ?? ''), helpText: '', validation: 'none', options: [] })) })); }
   function marcarMigracaoRecursos() { if (state.meta.resourceTemplateMigration >= 1) return; persistir({ ...state, meta: { ...state.meta, resourceTemplateMigration: 1 } }); }
-  window.paraibaDocumentApp = { activateView: ativarView, saveDynamicDocument: salvarDocumentoDinamico, legacyTemplates: modelosLegadosParaMigrar, markResourceMigration: marcarMigracaoRecursos };
+  window.paraibaDocumentApp = {
+    activateView: ativarView,
+    requestIssueReview: solicitarRevisaoEmissao,
+    previewDynamicIdentity: identidadeDocumentoDinamico,
+    saveDynamicDocument: salvarDocumentoDinamico,
+    validateReceipt: data => validarDados(data, { numero: false }),
+    notify: toast,
+    legacyTemplates: modelosLegadosParaMigrar,
+    markResourceMigration: marcarMigracaoRecursos
+  };
   $('backupBtn').addEventListener('click', exportarBackup);
   $('secureBackupBtn').addEventListener('click', exportarBackupProtegido);
   $('importBtn').addEventListener('click', () => $('importFile').click());
@@ -1466,14 +1622,14 @@
   document.querySelectorAll('.app-tabs [role="tab"]').forEach(tab => { tab.addEventListener('click', () => ativarView(tab.dataset.view)); tab.addEventListener('keydown', e => { const tabs = [...document.querySelectorAll('.app-tabs [role="tab"]')], i = tabs.indexOf(tab); let destino = -1; if (e.key === 'ArrowRight') destino = (i + 1) % tabs.length; else if (e.key === 'ArrowLeft') destino = (i - 1 + tabs.length) % tabs.length; else if (e.key === 'Home') destino = 0; else if (e.key === 'End') destino = tabs.length - 1; if (destino >= 0) { e.preventDefault(); ativarView(tabs[destino].dataset.view, { focar: true }); } }); });
   document.addEventListener('click', event => { if (event.target.closest('.app-tabs [role="tab"]')) fecharMenuApp(); });
   $('confirmModal').addEventListener('click', e => {
-    if (e.target === $('confirmModal')) { pendingIssue = null; fecharModal('confirmModal'); }
+    if (e.target === $('confirmModal')) cancelarRevisao();
   });
   $('cancelModal').addEventListener('click', e => { if (e.target === $('cancelModal')) fecharCancelamento(); });
   document.addEventListener('keydown', e => {
     manterFocoNoModal(e);
     if (e.key !== 'Escape') return;
     if (menuAppAberto()) { fecharMenuApp(); $('appMenuToggle').focus(); }
-    else if (!$('confirmModal').hidden) { pendingIssue = null; fecharModal('confirmModal'); }
+    else if (!$('confirmModal').hidden) cancelarRevisao();
     else if (!$('cancelModal').hidden) fecharCancelamento();
     else if (document.body.classList.contains('preview-open')) { fecharPreview(); $('previewMobileBtn').focus(); }
   });

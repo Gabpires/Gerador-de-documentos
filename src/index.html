@@ -2118,37 +2118,21 @@
         aria-describedby="confirmDescription"
         tabindex="-1"
       >
-        <h2 id="confirmTitle">Confirmar emissão</h2>
+        <h2 id="confirmTitle">Revisar emissão</h2>
         <p id="confirmDescription">
-          Confira os dados antes de registrar. Após a emissão, o conteúdo ficará
-          travado.
+          Confira os dados críticos antes de criar o registro definitivo.
         </p>
-        <dl class="confirm-grid">
-          <dt>Número</dt>
-          <dd id="confirmNumber"></dd>
-          <dt>Locatário</dt>
-          <dd id="confirmTenant"></dd>
-          <dt>Valor</dt>
-          <dd id="confirmAmount"></dd>
-          <dt>Imóvel</dt>
-          <dd id="confirmProperty"></dd>
-          <dt>Referência</dt>
-          <dd id="confirmReference"></dd>
-          <dt>Pagamento</dt>
-          <dd id="confirmPayment"></dd>
-          <dt>Responsável</dt>
-          <dd id="confirmOperator"></dd>
-          <dt>Controle interno</dt>
-          <dd id="confirmInternal"></dd>
-        </dl>
-        <div class="modal-warning">
-          A numeração será reservada ao confirmar a emissão.
+        <dl class="confirm-grid" id="confirmFields"></dl>
+        <div class="modal-warning" id="confirmConsequence">
+          A numeração será reservada somente ao emitir e o registro será
+          preservado no histórico.
         </div>
+        <p class="modal-error" id="confirmError" role="alert" tabindex="-1" hidden></p>
         <div class="modal-actions">
           <button class="btn btn-secondary" type="button" id="cancelIssueBtn">
             Voltar e revisar</button
           ><button class="btn btn-primary" type="button" id="confirmIssueBtn">
-            Confirmar emissão
+            Emitir e registrar
           </button>
         </div>
       </div>

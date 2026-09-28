@@ -67,6 +67,7 @@
   }
   function humanDate(value) { if (!/^\d{4}-\d{2}-\d{2}$/.test(text(value))) return text(value); const [year, month, day] = value.split('-'); return `${day}/${month}/${year}`; }
   function formatValue(field, value) {
+    if (field.type === 'checkbox') return value === true ? 'Sim' : 'Não';
     if (field.type === 'select') return field.options.find(option => option.value === value)?.label || value;
     if (field.type === 'date') return humanDate(value);
     if (field.type === 'currency' && value) { const number = Number(text(value).replace(/\./g, '').replace(',', '.')); if (Number.isFinite(number)) return number.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -77,8 +78,9 @@
     definition.fields.forEach(field => { const input = form.elements.namedItem(field.id); values[field.id] = input ? (field.type === 'checkbox' ? input.checked : input.value) : field.defaultValue; });
     return values;
   }
-  function validateValues(form, definition) {
+  function validateValues(form, definition, { focus = true } = {}) {
     let first = null, valid = true;
+    const invalid = [];
     definition.fields.forEach(field => {
       const input = form.elements.namedItem(field.id), error = $(`dynamic-error-${field.id}`), raw = input ? (field.type === 'checkbox' ? input.checked : input.value.trim()) : '';
       let message = '';
@@ -88,9 +90,19 @@
       if (!message && raw && field.validation === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) message = 'Informe uma data válida.';
       input?.setAttribute('aria-invalid', message ? 'true' : 'false');
       if (error) error.textContent = message;
-      if (message) { valid = false; if (!first) first = input; }
+      if (message) { valid = false; invalid.push({ field, input, message }); if (!first) first = input; }
     });
-    if (first) { first.focus(); first.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    const summary = form.querySelector('#dynamicValidationSummary');
+    if (summary) {
+      summary.replaceChildren(); summary.hidden = !invalid.length;
+      if (invalid.length) {
+        summary.append(createElement('strong', { text: invalid.length === 1 ? 'Falta corrigir 1 campo antes da revisão.' : `Faltam corrigir ${invalid.length} campos antes da revisão.` }));
+        const list = createElement('ul');
+        invalid.forEach(({ field, input, message }) => { const item = createElement('li'); item.append(createElement('button', { type: 'button', text: field.name, onClick: () => { input?.focus(); input?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); } }), document.createTextNode(' — ' + message)); list.append(item); });
+        summary.append(list);
+      }
+    }
+    if (first && focus) { first.focus(); first.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
     return valid;
   }
   function createElement(tag, properties = {}, children = []) {
@@ -229,6 +241,7 @@
     head.append(createElement('div', {}, [createElement('h2', { text: record ? definition.name : `Novo ${labels[definition.documentKind].toLowerCase()}` }), createElement('p', { text: record ? 'Snapshot emitido: este conteúdo não será alterado por edições futuras.' : 'Preencha os campos e revise a prévia antes de emitir.' })]));
     head.append(createElement('button', { type: 'button', text: 'Voltar ao fluxo anterior', className: 'btn btn-quiet', onClick: closeDocument })); panel.append(head);
     const form = createElement('form', { className: 'dynamic-document-form' });
+    form.append(createElement('section', { id: 'dynamicValidationSummary', className: 'dynamic-validation-summary', role: 'alert', hidden: true }));
     definition.fields.forEach(field => {
       const wrapper = createElement('label', { className: 'field dynamic-field' }); wrapper.append(createElement('span', { text: field.name + (field.required ? ' *' : '') }));
       let input;
@@ -241,15 +254,58 @@
     if (!record) { const actions = createElement('div', { className: 'dynamic-document-actions' }); actions.append(createElement('button', { type: 'button', className: 'btn btn-secondary', text: 'Salvar rascunho', onClick: () => persistDocument('draft', form) }), createElement('button', { type: 'button', className: 'btn btn-primary', text: definition.documentKind === 'custom' ? 'Emitir documento' : 'Emitir e numerar', onClick: () => persistDocument('issued', form) })); form.append(actions); }
     panel.append(form); const preview = createElement('section', { className: 'dynamic-preview-panel' }); preview.append(createElement('h2', { text: 'Prévia A4' }), createElement('iframe', { id: 'dynamicDocumentPreview', title: 'Prévia do documento dinâmico', sandbox: '' })); if (record) preview.append(createElement('button', { type: 'button', className: 'btn btn-secondary', text: 'Imprimir snapshot', onClick: () => printSnapshot(record.templateSnapshot?.renderedHtml) })); shell.append(panel, preview); host.append(shell); refreshDocumentPreview(); }
   function refreshDocumentPreview() { const frame = $('dynamicDocumentPreview'); if (!frame || !activeDocument) return; const values = Object.fromEntries(activeDocument.template.definition.fields.map(field => [field.id, formatValue(field, activeDocument.values[field.id])])); frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">${renderHtml(activeDocument.template, values)}`; }
+  function dynamicFingerprint(template, values) { return JSON.stringify({ id: template.definition.id, revision: template.definition.revision, html: template.html, values }); }
+  function dynamicReviewFields(template, values, identity) {
+    const definition = template.definition;
+    return [
+      { label: 'Modelo', value: `${definition.name} · revisão ${definition.revision || 1}` },
+      { label: 'Categoria', value: labels[definition.documentKind] || 'Documento' },
+      { label: 'Número proposto', value: identity.number || 'Sem numeração · documento livre' },
+      { label: 'Responsável', value: identity.operator },
+      ...definition.fields.filter(field => field.required || text(values[field.id]).trim() || values[field.id] === true).map(field => ({ label: field.name, value: formatValue(field, values[field.id]) }))
+    ];
+  }
   async function persistDocument(status, form) {
-    if (status === 'issued' && !validateValues(form, activeDocument.template.definition)) return;
+    if (status === 'issued' && !validateValues(form, activeDocument.template.definition)) { notice('Confira os campos obrigatórios indicados antes de revisar a emissão.', true); return; }
     activeDocument.values = valuesOf(form, activeDocument.template.definition);
-    const values = Object.fromEntries(activeDocument.template.definition.fields.map(field => [field.id, formatValue(field, activeDocument.values[field.id])]));
-    const renderedHtml = renderHtml(activeDocument.template, values, status !== 'issued');
+    const template = activeDocument.template, definition = template.definition;
+    if (status === 'issued') {
+      const identity = window.paraibaDocumentApp?.previewDynamicIdentity(definition.documentKind, activeDocument.values);
+      const requestReview = window.paraibaDocumentApp?.requestIssueReview;
+      if (!identity || typeof requestReview !== 'function') { notice('A revisão da emissão não está disponível. Recarregue a página e tente novamente.', true); return; }
+      const reviewedValues = { ...activeDocument.values }, reviewedFingerprint = dynamicFingerprint(template, reviewedValues);
+      await requestReview({
+        title: `Revisar emissão de ${labels[definition.documentKind].toLowerCase()}`,
+        description: 'Confira o modelo e os valores atuais. Os nomes abaixo seguem os campos definidos no template.',
+        fields: dynamicReviewFields(template, reviewedValues, identity),
+        consequence: identity.number ? 'O número será reservado somente ao emitir. O template, os valores e o HTML ficarão congelados no histórico.' : 'Este documento livre não receberá número. O template, os valores e o HTML ficarão congelados no histórico.',
+        validate: () => {
+          if (!activeDocument || !validateValues(form, definition, { focus: false })) return { ok: false, invalidFields: true, message: 'Existem campos obrigatórios ou inválidos. Corrija-os e abra uma nova revisão.' };
+          const currentValues = valuesOf(form, definition), currentIdentity = window.paraibaDocumentApp.previewDynamicIdentity(definition.documentKind, currentValues);
+          if (dynamicFingerprint(activeDocument.template, currentValues) !== reviewedFingerprint || currentIdentity.number !== identity.number || Number(currentIdentity.year) !== Number(identity.year)) return { ok: false, stale: true, message: 'Os valores ou a numeração mudaram. Confira e abra uma nova revisão.' };
+          return { ok: true };
+        },
+        onInvalid: result => { if (result.invalidFields) validateValues(form, definition); notice(result.message || 'Confira os dados e abra a revisão novamente.', true); },
+        commit: () => {
+          const formattedValues = Object.fromEntries(definition.fields.map(field => [field.id, formatValue(field, reviewedValues[field.id])]));
+          const record = window.paraibaDocumentApp.saveDynamicDocument({ status, definition, html: sanitizeHtml(template.html), renderedHtml: renderHtml(template, formattedValues, false), values: reviewedValues, expectedIdentity: identity });
+          if (!record) throw new Error('Não foi possível registrar o documento neste navegador. Seus valores continuam na edição.');
+          return record;
+        },
+        onSuccess: record => {
+          notice(`${record.number || 'Documento'} emitido, registrado e congelado no histórico.`);
+          activeDocument = { template: { definition: record.templateSnapshot.definition, html: record.templateSnapshot.html }, values: record.fields };
+          buildDocumentForm(record);
+        }
+      });
+      return;
+    }
+    const values = Object.fromEntries(definition.fields.map(field => [field.id, formatValue(field, activeDocument.values[field.id])]));
+    const renderedHtml = renderHtml(template, values, true);
     try {
-      const record = window.paraibaDocumentApp?.saveDynamicDocument({ status, definition: activeDocument.template.definition, html: sanitizeHtml(activeDocument.template.html), renderedHtml, values: activeDocument.values });
+      const record = window.paraibaDocumentApp?.saveDynamicDocument({ status, definition, html: sanitizeHtml(template.html), renderedHtml, values: activeDocument.values });
       if (!record) throw new Error('O armazenamento local não está disponível.');
-      notice(status === 'issued' ? `${record.number || 'Documento'} emitido e congelado no histórico.` : 'Rascunho salvo no histórico.');
+      notice('Rascunho salvo no histórico.');
       activeDocument = { template: { definition: record.templateSnapshot.definition, html: record.templateSnapshot.html }, values: record.fields };
       buildDocumentForm(record);
     } catch (error) { notice(error.message, true); }
