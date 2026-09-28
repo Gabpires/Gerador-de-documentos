@@ -166,29 +166,28 @@
   function findDossier(state, management, targetId) { return dossiers(state, management).find(item => item.id === targetId); }
   function docsForDossier(state, management, targetId) { return allDocuments(state).filter(record => documentDossierId(record, management) === targetId); }
 
-  function addTab(id, label, beforeId) {
+  function addTab(id, label, group, beforeId) {
     const tab = document.createElement('button');
     tab.type = 'button'; tab.role = 'tab'; tab.id = `tab-${id}`; tab.dataset.view = id;
-    tab.setAttribute('aria-controls', `view-${id}`); tab.setAttribute('aria-selected', 'false'); tab.textContent = label;
-    const nav = document.querySelector('.app-tabs');
+    tab.setAttribute('aria-controls', `view-${id}`); tab.setAttribute('aria-selected', 'false'); tab.tabIndex = -1; tab.textContent = label;
+    const nav = $(`tabGroup${group}`) || document.querySelector('.app-tabs');
     const before = beforeId && $(beforeId);
     nav.insertBefore(tab, before || null);
   }
   function createViews() {
-    addTab('management', '◈ Gestão', 'tab-new');
-    addTab('dossiers', '▣ Dossiês', 'tab-history');
+    addTab('management', 'Gestão', 'Follow', 'tab-history');
+    addTab('dossiers', 'Dossiês', 'Follow', 'tab-history');
     const root = $('mainContent');
     const management = document.createElement('section');
     management.className = 'view-panel'; management.id = 'view-management'; management.dataset.panel = 'management'; management.hidden = true;
     management.setAttribute('role', 'tabpanel'); management.setAttribute('aria-labelledby', 'tab-management');
     management.innerHTML = `
       <div class="management-layout">
-        <div class="content-card management-hero"><div><span class="eyebrow">Central de operação</span><h2>Gestão documental</h2><p>Priorize pendências, acompanhe contratos e trabalhe a partir dos dossiês.</p></div><div class="header-actions"><button class="btn btn-primary" type="button" id="openDossiersBtn">Abrir dossiês</button><button class="btn btn-secondary" type="button" id="openBatchBtn">Emissão em lote</button></div></div>
-        <div class="management-kpis" id="managementKpis" aria-live="polite"></div>
-        <div class="management-grid"><section class="content-card"><div class="section-heading"><div><span class="eyebrow">Agenda</span><h3>Contratos e pendências</h3></div></div><div id="managementAgenda" class="management-list"></div></section><section class="content-card"><div class="section-heading"><div><span class="eyebrow">Relatório</span><h3>Recebimentos por imóvel</h3></div></div><div id="managementReport" class="management-list"></div></section></div>
-        <section class="content-card" id="batchCard"><div class="section-heading"><div><span class="eyebrow">Competência</span><h3>Emissão mensal em lote</h3><p>Somente documentos válidos recebem número ao confirmar o lote.</p></div></div><div class="batch-controls"><label class="filter-field"><span>Mês de referência</span><input id="batchReference" type="month" /></label><label class="filter-field"><span>Responsável</span><select id="batchOperator"><option value="Sandra Marcondes da Silva Alves">Sandra Marcondes da Silva Alves</option><option value="Ruziel Aparecido Alves Guilherme">Ruziel Aparecido Alves Guilherme</option></select></label><button class="btn btn-secondary" type="button" id="buildBatchBtn">Validar lote</button></div><div id="batchDossierList" class="batch-dossiers"></div><div id="batchPreview" class="management-list" aria-live="polite"></div><button class="btn btn-primary" type="button" id="issueBatchBtn" disabled>Confirmar emissão do lote</button></section>
-        <section class="content-card"><div class="section-heading"><div><span class="eyebrow">Consulta</span><h3>Pesquisa avançada e visões salvas</h3></div></div><div class="advanced-search"><label class="filter-field filter-search"><span>Palavra-chave</span><input id="advancedSearch" type="search" placeholder="Documento, pessoa, imóvel ou contrato" /></label><label class="filter-field"><span>Imóvel/contrato</span><input id="advancedProperty" placeholder="Local ou código" /></label><label class="filter-field"><span>De</span><input id="advancedFrom" type="date" /></label><label class="filter-field"><span>Até</span><input id="advancedTo" type="date" /></label><label class="filter-field"><span>Situação</span><select id="advancedStatus"><option value="">Todas</option></select></label><label class="filter-field"><span>Assinatura</span><select id="advancedSignature"><option value="">Todas</option><option value="pending">Pendente</option><option value="signed">Assinado</option></select></label><label class="filter-field"><span>Responsável</span><select id="advancedOperator"><option value="">Todos</option><option>Sandra Marcondes da Silva Alves</option><option>Ruziel Aparecido Alves Guilherme</option></select></label><label class="filter-field"><span>Etiqueta</span><input id="advancedTag" placeholder="Ex.: renovação" /></label><button class="btn btn-secondary" type="button" id="saveViewBtn">Salvar visão</button></div><div class="saved-view-row"><select id="savedViewSelect" aria-label="Visões salvas"><option value="">Visões salvas</option></select><button class="btn btn-quiet" type="button" id="deleteViewBtn">Excluir visão</button></div><div id="advancedResults" class="management-list"></div></section>
-        <section class="content-card"><div class="section-heading"><div><span class="eyebrow">Governança</span><h3>Modelos, qualidade e privacidade</h3></div></div><div id="managementGovernance" class="management-list"></div></section>
+        <section class="content-card management-workbench" aria-labelledby="managementTitle"><div class="management-heading"><h2 id="managementTitle">Gestão documental</h2><p>Escolha a próxima tarefa; os recursos de consulta e administração continuam disponíveis abaixo.</p></div><div id="managementEmptyState" class="management-empty-state" hidden></div><div class="management-task-grid"><section class="management-task management-task-primary" aria-labelledby="managementIssueTitle"><h3 id="managementIssueTitle">Emitir agora</h3><p>Abra um novo documento e siga para preenchimento, revisão e emissão.</p><div class="header-actions"><button class="btn btn-primary" type="button" id="managementNewDocumentBtn">Novo documento</button><button class="btn btn-secondary" type="button" id="openDossiersBtn">Criar dossiê</button></div></section><section class="management-task" aria-labelledby="managementContinueTitle"><h3 id="managementContinueTitle">Continuar trabalho</h3><div id="managementContinue" class="management-list"></div></section><section class="management-task" aria-labelledby="managementPendingTitle"><h3 id="managementPendingTitle">Pendências</h3><div id="managementPending" class="management-list"></div><div id="managementBatchAction"></div></section></div></section>
+        <section class="management-indicators" id="managementKpis" aria-label="Indicadores operacionais" aria-live="polite"></section>
+        <details class="content-card management-disclosure" id="batchCard"><summary><span><strong>Emissão mensal em lote</strong><small>Selecione dossiês e confirme somente depois de validar os dados.</small></span><span id="batchAvailability" class="management-disclosure-meta"></span></summary><div class="management-disclosure-content"><div class="batch-controls"><label class="filter-field"><span>Mês de referência</span><input id="batchReference" type="month" /></label><label class="filter-field"><span>Responsável</span><select id="batchOperator"><option value="Sandra Marcondes da Silva Alves">Sandra Marcondes da Silva Alves</option><option value="Ruziel Aparecido Alves Guilherme">Ruziel Aparecido Alves Guilherme</option></select></label><button class="btn btn-secondary" type="button" id="buildBatchBtn">Validar lote</button></div><div id="batchDossierList" class="batch-dossiers"></div><div id="batchPreview" class="management-list" aria-live="polite"></div><button class="btn btn-primary" type="button" id="issueBatchBtn" disabled>Confirmar emissão do lote</button></div></details>
+        <details class="content-card management-disclosure" id="advancedSearchDetails"><summary><span><strong>Busca avançada e visões salvas</strong><small>Localize documentos por pessoa, imóvel, período, situação ou etiqueta.</small></span></summary><div class="management-disclosure-content"><div class="advanced-search"><label class="filter-field filter-search"><span>Palavra-chave</span><input id="advancedSearch" type="search" placeholder="Documento, pessoa, imóvel ou contrato" /></label><label class="filter-field"><span>Imóvel/contrato</span><input id="advancedProperty" placeholder="Local ou código" /></label><label class="filter-field"><span>De</span><input id="advancedFrom" type="date" /></label><label class="filter-field"><span>Até</span><input id="advancedTo" type="date" /></label><label class="filter-field"><span>Situação</span><select id="advancedStatus"><option value="">Todas</option></select></label><label class="filter-field"><span>Assinatura</span><select id="advancedSignature"><option value="">Todas</option><option value="pending">Pendente</option><option value="signed">Assinado</option></select></label><label class="filter-field"><span>Responsável</span><select id="advancedOperator"><option value="">Todos</option><option>Sandra Marcondes da Silva Alves</option><option>Ruziel Aparecido Alves Guilherme</option></select></label><label class="filter-field"><span>Etiqueta</span><input id="advancedTag" placeholder="Ex.: renovação" /></label><button class="btn btn-secondary" type="button" id="saveViewBtn">Salvar visão</button></div><div class="saved-view-row"><select id="savedViewSelect" aria-label="Visões salvas"><option value="">Visões salvas</option></select><button class="btn btn-quiet" type="button" id="deleteViewBtn">Excluir visão</button></div><div id="advancedResults" class="management-list"></div></div></details>
+        <details class="content-card management-disclosure" id="governanceDetails"><summary><span><strong>Governança, modelos e backup</strong><small>Revise a qualidade dos cadastros, os modelos e a proteção local.</small></span></summary><div class="management-disclosure-content"><div id="managementGovernance" class="management-list"></div></div></details>
       </div>`;
     const dossier = document.createElement('section');
     dossier.className = 'view-panel'; dossier.id = 'view-dossiers'; dossier.dataset.panel = 'dossiers'; dossier.hidden = true;
@@ -219,21 +218,51 @@
     const currentMonth = month();
     const receipts = records.filter(record => record.type === 'receipt' && documentStatus(record) === 'issued');
     const thisMonth = receipts.filter(record => clean(record.reference) === currentMonth);
-    const pending = records.filter(record => ['draft', 'review', 'awaiting_signature'].includes(documentStatus(record))).length;
+    const drafts = records.filter(record => documentStatus(record) === 'draft');
+    const documentsNeedingStatus = records.filter(record => ['review', 'sent', 'awaiting_signature'].includes(documentStatus(record)));
     const expiring = items.filter(item => item.endDate && daysUntil(item.endDate) >= 0 && daysUntil(item.endDate) <= 60);
-    const unsigned = records.filter(record => ['sent', 'awaiting_signature'].includes(documentStatus(record))).length;
-    const backupOld = !state.meta || !state.meta.lastBackupAt || (Date.now() - new Date(state.meta.lastBackupAt).getTime()) > 7 * 86400000;
-    $('managementKpis').innerHTML = card('Rascunhos e revisão', pending, 'Documentos que exigem ação') + card('Contratos a vencer', expiring.length, 'Nos próximos 60 dias') + card('Recebido no mês', money(thisMonth.reduce((sum, record) => sum + (Number(record.amount) || 0), 0)), `${thisMonth.length} recibo(s) emitido(s)`) + card('Assinaturas pendentes', unsigned, 'Enviados ou aguardando assinatura') + card('Backup', backupOld ? 'Atenção' : 'Em dia', backupOld ? 'Exporte uma nova cópia' : 'Cópia recente registrada');
-    const agenda = [...expiring.map(item => ({ kind: 'contract', item })), ...records.filter(record => ['draft', 'review', 'awaiting_signature'].includes(documentStatus(record))).slice(0, 8).map(record => ({ kind: 'document', record }))];
-    $('managementAgenda').replaceChildren(...(agenda.length ? agenda.map(agendaRow) : [empty('Nenhuma pendência operacional no momento.')]));
-    const byDossier = new Map();
-    receipts.filter(record => clean(record.reference) === currentMonth).forEach(record => { const key = documentDossierId(record, management) || 'sem-dossie'; byDossier.set(key, (byDossier.get(key) || 0) + (Number(record.amount) || 0)); });
-    const report = [...byDossier.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([key, value]) => { const item = findDossier(state, management, key); return row(item ? item.property : 'Sem dossiê vinculado', money(value)); });
-    $('managementReport').replaceChildren(...(report.length ? report : [empty('Ainda não há recebimentos emitidos nesta competência.')]));
+    const readyForBatch = batchReadyDossiers(state, management, items);
+    renderManagementEmptyState(records, items);
+    renderContinueWork(drafts);
+    renderPendingWork(documentsNeedingStatus, expiring);
+    renderBatchShortcut(readyForBatch);
+    $('managementKpis').innerHTML = card('Rascunhos', drafts.length, drafts.length ? 'Prontos para continuar' : 'Nenhum em andamento') + card('Situações a atualizar', documentsNeedingStatus.length + expiring.length, 'Documentos e contratos') + card('Recebido no mês', money(thisMonth.reduce((sum, record) => sum + (Number(record.amount) || 0), 0)), `${thisMonth.length} recibo(s) emitido(s)`);
+    $('batchAvailability').textContent = readyForBatch.length ? `${readyForBatch.length} dossiê(s) apto(s)` : 'Nenhum dossiê apto';
     renderBatch(items); renderAdvanced(); renderSavedViews(management); renderGovernance(state, management);
   }
   function card(title, value, description) { return `<article class="management-kpi"><span>${escape(title)}</span><strong>${escape(value)}</strong><small>${escape(description)}</small></article>`; }
   function empty(message) { const item = document.createElement('p'); item.className = 'management-empty'; item.textContent = message; return item; }
+  function openNewDocument() { window.paraibaDocumentApp?.activateView('new'); setTimeout(() => $('tenant')?.focus(), 0); }
+  function renderManagementEmptyState(records, items) {
+    const box = $('managementEmptyState'); if (!box) return;
+    const hasIssuedDocument = records.some(record => documentStatus(record) !== 'draft');
+    box.hidden = hasIssuedDocument || items.length > 0;
+    box.replaceChildren();
+    if (box.hidden) return;
+    const title = document.createElement('h3'); title.textContent = 'Comece pela próxima emissão';
+    const description = document.createElement('p'); description.textContent = 'Você preencherá os dados, revisará o documento e só então confirmará o registro local.';
+    const action = button('Emitir novo documento', openNewDocument, 'btn btn-primary'); action.id = 'managementEmptyIssueBtn';
+    box.append(title, description, action);
+  }
+  function renderContinueWork(drafts) {
+    const box = $('managementContinue'); if (!box) return; box.replaceChildren();
+    if (!drafts.length) { box.append(empty('Não há rascunhos em andamento.')); return; }
+    drafts.slice(0, 3).forEach(record => {
+      const line = row(documentTitle(record), record.updatedAt ? `Atualizado em ${dateTime(record.updatedAt)}` : 'Pronto para continuar');
+      box.append(interactiveRow(line, () => window.paraibaDocumentApp?.resumeDraft(record), `Continuar ${documentTitle(record)}`));
+    });
+  }
+  function renderPendingWork(records, expiring) {
+    const box = $('managementPending'); if (!box) return; box.replaceChildren();
+    const entries = [...records.map(record => ({ kind: 'document', record })), ...expiring.map(item => ({ kind: 'contract', item }))];
+    box.append(...(entries.length ? entries.slice(0, 4).map(agendaRow) : [empty('Nenhuma pendência operacional no momento.')]));
+  }
+  function renderBatchShortcut(readyForBatch) {
+    const box = $('managementBatchAction'); if (!box) return; box.replaceChildren();
+    if (!readyForBatch.length) return;
+    box.append(button(`Preparar emissão em lote (${readyForBatch.length})`, openBatch, 'btn btn-secondary'));
+  }
+  function openBatch() { const batch = $('batchCard'); batch.open = true; batch.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   function row(label, value) { const item = document.createElement('div'); item.className = 'management-row'; const strong = document.createElement('strong'); strong.textContent = label; const span = document.createElement('span'); span.textContent = value; item.append(strong, span); return item; }
   function interactiveRow(item, action, label) { item.classList.add('is-interactive'); item.tabIndex = 0; item.setAttribute('role', 'button'); if (label) item.setAttribute('aria-label', label); item.addEventListener('click', action); item.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); action(); } }); return item; }
   function agendaRow(entry) { if (entry.kind === 'contract') { const item = row(entry.item.property, `Término em ${date(entry.item.endDate)}`); item.classList.add('warning-row'); return interactiveRow(item, () => selectDossier(entry.item.id), `Abrir dossiê ${entry.item.property}`); } const item = row(documentTitle(entry.record), STATUS[documentStatus(entry.record)]); return interactiveRow(item, () => openStatus(entry.record.recordId), `Atualizar situação de ${documentTitle(entry.record)}`); }
@@ -254,18 +283,23 @@
     if (!$('batchReference').value) $('batchReference').value = month();
   }
   function selectedBatchIds() { return [...document.querySelectorAll('#batchDossierList input:checked')].map(input => input.value); }
+  function batchCandidateForDossier(state, management, targetId, reference, operator) {
+    const item = findDossier(state, management, targetId);
+    if (!item) return { dossierId: targetId, property: 'Dossiê indisponível', error: 'O dossiê foi alterado ou removido.' };
+    const latest = docsForDossier(state, management, targetId).filter(record => record.type === 'receipt').sort((a, b) => text(b.reference).localeCompare(text(a.reference)))[0];
+    const amount = Number(item.amount || (latest && latest.amount) || 0);
+    const record = { dossierId: targetId, tenant: item.tenant, cpf: item.tenantDocument, property: item.property, contractCode: item.contractCode || '', dueDay: Number(item.dueDay) || 0, amount, reference, payment: item.payment || (latest && latest.payment) || 'Dinheiro', receiptDate: today(), operator };
+    const validation = window.paraibaDocumentApp?.validateReceipt({ ...record, number: '01/' + record.receiptDate.slice(0, 4), year: Number(record.receiptDate.slice(0, 4)) }) || {};
+    record.error = !reference ? 'Informe a competência.' : Object.values(validation)[0] || '';
+    return record;
+  }
   function batchCandidates(state, management) {
     const reference = $('batchReference').value, operator = $('batchOperator').value;
-    return selectedBatchIds().map(targetId => {
-      const item = findDossier(state, management, targetId);
-      if (!item) return { dossierId: targetId, property: 'Dossiê indisponível', error: 'O dossiê foi alterado ou removido.' };
-      const latest = docsForDossier(state, management, targetId).filter(record => record.type === 'receipt').sort((a, b) => text(b.reference).localeCompare(text(a.reference)))[0];
-      const amount = Number(item.amount || (latest && latest.amount) || 0);
-      const record = { dossierId: targetId, tenant: item.tenant, cpf: item.tenantDocument, property: item.property, contractCode: item.contractCode || '', dueDay: Number(item.dueDay) || 0, amount, reference, payment: item.payment || (latest && latest.payment) || 'Dinheiro', receiptDate: today(), operator };
-      const validation = window.paraibaDocumentApp?.validateReceipt({ ...record, number: '01/' + record.receiptDate.slice(0, 4), year: Number(record.receiptDate.slice(0, 4)) }) || {};
-      record.error = !reference ? 'Informe a competência.' : Object.values(validation)[0] || '';
-      return record;
-    });
+    return selectedBatchIds().map(targetId => batchCandidateForDossier(state, management, targetId, reference, operator));
+  }
+  function batchReadyDossiers(state, management, items) {
+    const operator = $('batchOperator')?.value || 'Sandra Marcondes da Silva Alves';
+    return items.filter(item => item.status !== 'inactive' && !batchCandidateForDossier(state, management, item.id, month(), operator).error);
   }
   function renderBatchValidation() {
     const box = $('batchPreview'); box.replaceChildren();
@@ -453,7 +487,7 @@
   function renderTemplateGovernance() { const state = read(); if (!state) return; const management = managementOf(state), template = (state.templates || []).find(item => item.id === $('governanceTemplateSelect').value), box = $('governanceClauses'); box.replaceChildren(); if (!template) { $('governanceTemplateInfo').textContent = 'Selecione um modelo de contrato para configurar as cláusulas obrigatórias.'; return; } const current = management.modelGovernance[template.id] || { version: 1, requiredClauses: [] }; const labels = { payment: 'Pagamento e vencimento', maintenance: 'Conservação e manutenção', adjustment: 'Reajuste', termination: 'Rescisão', inspection: 'Vistoria' }; Object.entries(labels).forEach(([key, label]) => { const row = document.createElement('label'); row.className = 'check-row'; const input = document.createElement('input'); input.type = 'checkbox'; input.checked = (current.requiredClauses || []).includes(key); input.addEventListener('change', () => update((source, data) => { const governance = data.modelGovernance[template.id] || { version: 1, requiredClauses: [] }; const requiredClauses = new Set(governance.requiredClauses || []); input.checked ? requiredClauses.add(key) : requiredClauses.delete(key); data.modelGovernance[template.id] = { ...governance, requiredClauses: [...requiredClauses], updatedAt: now() }; audit(data, { action: 'governança de modelo atualizada', actor: source.meta && source.meta.defaultOperator || '', detail: template.name }); })); row.append(input, document.createTextNode(label)); box.append(row); }); const used = (state.documents || []).filter(record => record.templateId === template.id).length; $('governanceTemplateInfo').textContent = `Revisão ${current.version || 1} · ${used} documento(s) emitido(s) com este modelo.`; }
 
   function bind() {
-    $('openDossiersBtn').addEventListener('click', () => $('tab-dossiers').click()); $('openBatchBtn').addEventListener('click', () => $('batchCard').scrollIntoView({ behavior: 'smooth', block: 'start' })); $('buildBatchBtn').addEventListener('click', validateBatch); $('issueBatchBtn').addEventListener('click', issueBatch);
+    $('managementNewDocumentBtn').addEventListener('click', openNewDocument); $('openDossiersBtn').addEventListener('click', () => $('tab-dossiers').click()); $('buildBatchBtn').addEventListener('click', validateBatch); $('issueBatchBtn').addEventListener('click', issueBatch);
     ['advancedSearch', 'advancedProperty', 'advancedFrom', 'advancedTo', 'advancedStatus', 'advancedSignature', 'advancedOperator', 'advancedTag'].forEach(target => $(target).addEventListener(['advancedSearch', 'advancedProperty', 'advancedTag'].includes(target) ? 'input' : 'change', renderAdvanced)); $('saveViewBtn').addEventListener('click', saveView); $('savedViewSelect').addEventListener('change', applyView); $('deleteViewBtn').addEventListener('click', () => { const target = $('savedViewSelect').value; if (!target) return; update((state, management) => { management.savedViews = management.savedViews.filter(view => view.id !== target); audit(management, { action: 'visão excluída', actor: state.meta && state.meta.defaultOperator || '' }); }); renderDashboard(); });
     $('toggleDossierForm').addEventListener('click', () => { const form = $('dossierForm'); form.hidden = !form.hidden; $('toggleDossierForm').setAttribute('aria-expanded', form.hidden ? 'false' : 'true'); if (!form.hidden) $('dossierProperty').focus(); }); $('cancelDossierBtn').addEventListener('click', closeDossierForm); $('dossierForm').addEventListener('submit', saveDossier); $('dossierSearch').addEventListener('input', renderDossiers); $('dossierStatusFilter').addEventListener('change', renderDossiers);
     $('closeManagementStatusBtn').addEventListener('click', closeStatus); $('confirmManagementStatusBtn').addEventListener('click', confirmStatus); $('managementStatusReason').addEventListener('input', () => { $('managementStatusReason').setAttribute('aria-invalid', 'false'); $('managementStatusReasonError').textContent = ''; }); $('unlockManagementBtn').addEventListener('click', unlock); $('managementUnlockPassword').addEventListener('input', () => { $('managementUnlockPassword').setAttribute('aria-invalid', 'false'); $('managementUnlockError').textContent = ''; }); $('managementUnlockPassword').addEventListener('keydown', event => { if (event.key === 'Enter') unlock(); });

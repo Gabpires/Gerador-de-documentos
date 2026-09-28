@@ -41,61 +41,69 @@
           role="tablist"
           aria-label="Áreas do gerador"
         >
-          <button
-            type="button"
-            role="tab"
-            id="tab-new"
-            aria-controls="view-new"
-            aria-selected="true"
-            data-view="new"
-          >
-            ＋ Novo documento</button
-          ><button
-            type="button"
-            role="tab"
-            id="tab-history"
-            aria-controls="view-history"
-            aria-selected="false"
-            data-view="history"
-          >
-            ▤ Histórico</button
-          ><button
-            type="button"
-            role="tab"
-            id="tab-contacts"
-            aria-controls="view-contacts"
-            aria-selected="false"
-            data-view="contacts"
-          >
-            ♙ Cadastros</button
-          ><button
-            type="button"
-            role="tab"
-            id="tab-clients"
-            aria-controls="view-clients"
-            aria-selected="false"
-            data-view="clients"
-          >
-            ♙ Clientes</button
-          ><button
-            type="button"
-            role="tab"
-            id="tab-templates"
-            aria-controls="view-templates"
-            aria-selected="false"
-            data-view="templates"
-          >
-            ▦ Modelos</button
-          ><button
-            type="button"
-            role="tab"
-            id="tab-safety"
-            aria-controls="view-safety"
-            aria-selected="false"
-            data-view="safety"
-          >
-            ◇ Backup e segurança
-          </button>
+          <div class="tab-group" role="presentation">
+            <span class="tab-group-label">Emitir</span>
+            <div class="tab-group-items" id="tabGroupIssue" role="presentation">
+              <button
+                type="button"
+                role="tab"
+                id="tab-new"
+                aria-controls="view-new"
+                aria-selected="true"
+                data-view="new"
+              >Novo documento</button>
+            </div>
+          </div>
+          <div class="tab-group" role="presentation">
+            <span class="tab-group-label">Acompanhar</span>
+            <div class="tab-group-items" id="tabGroupFollow" role="presentation">
+              <button
+                type="button"
+                role="tab"
+                id="tab-history"
+                aria-controls="view-history"
+                aria-selected="false"
+                data-view="history"
+              >Histórico</button>
+            </div>
+          </div>
+          <div class="tab-group" role="presentation">
+            <span class="tab-group-label">Administrar</span>
+            <div class="tab-group-items" id="tabGroupAdmin" role="presentation">
+              <button
+                type="button"
+                role="tab"
+                id="tab-contacts"
+                aria-controls="view-contacts"
+                aria-selected="false"
+                data-view="contacts"
+              >Cadastros</button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-clients"
+                aria-controls="view-clients"
+                aria-selected="false"
+                data-view="clients"
+              >Clientes</button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-templates"
+                aria-controls="view-templates"
+                aria-selected="false"
+                data-view="templates"
+              >Modelos</button>
+              <button
+                type="button"
+                role="tab"
+                id="tab-safety"
+                aria-controls="view-safety"
+                aria-selected="false"
+                data-view="safety"
+              >Backup e segurança</button>
+            </div>
+          </div>
         </nav>
       </div>
       <main id="mainContent">

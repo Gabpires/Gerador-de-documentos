@@ -1709,6 +1709,14 @@
     return { number: numeroDocumento(kind, date), year };
   }
   function identidadeDocumentoDinamico(kind, fields) { state = lerEstado(); return { ...proximoNumeroDinamico(kind, normalizarCamposGenericos(fields)), operator: state.meta.defaultOperator || operadores[0] }; }
+  function retomarRascunho(record) {
+    if (!record) return false;
+    if (record.dynamic) { window.TemplateDocumentEngine?.openRecord(record); return true; }
+    if (record.recordId === 'receipt-draft' || (record.type === 'receipt' && !record.id)) {
+      selecionarTipoDocumento('receipt', { ignorarConfirmacao: true }); activeRecord = null; pendingIssue = null; travar(false); restaurarRascunho(); atualizar(); ativarView('new'); setTimeout(() => $('tenant').focus(), 0); return true;
+    }
+    return carregarDocumentoGenerico(record);
+  }
   function salvarDocumentoDinamico(payload) {
     if (storageCorrupted || !payload || !payload.definition || !DYNAMIC_TYPES.includes(payload.definition.documentKind)) return null;
     state = lerEstado();
@@ -1734,6 +1742,7 @@
     closeModal: fecharModal,
     requestAction: solicitarAcao,
     requestIssueReview: solicitarRevisaoEmissao,
+    resumeDraft: retomarRascunho,
     previewDynamicIdentity: identidadeDocumentoDinamico,
     saveDynamicDocument: salvarDocumentoDinamico,
     validateReceipt: data => validarDados(data, { numero: false }),

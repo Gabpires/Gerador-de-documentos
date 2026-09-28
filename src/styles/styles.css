@@ -2232,6 +2232,254 @@ summary:focus-visible,
     max-width: none;
   }
 }
+
+/* Gestão orientada à próxima tarefa e grupos de navegação. */
+.app-tabs {
+  align-items: flex-start;
+  gap: 14px;
+}
+.tab-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.tab-group-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.tab-group-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.management-layout {
+  gap: 16px;
+}
+.management-workbench {
+  padding-block: clamp(18px, 2.5vw, 25px);
+}
+.management-heading {
+  max-width: 72ch;
+  margin-bottom: 20px;
+}
+.management-heading h2 {
+  margin: 0 0 5px;
+  font-size: clamp(22px, 2.4vw, 30px);
+}
+.management-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.management-empty-state {
+  max-width: 72ch;
+  margin: 0 0 18px;
+  padding: 16px;
+  border: 1px solid #f0cdd1;
+  border-radius: 12px;
+  background: var(--brand-soft);
+}
+.management-empty-state h3,
+.management-empty-state p {
+  margin: 0;
+}
+.management-empty-state h3 {
+  font-size: 16px;
+}
+.management-empty-state p {
+  margin: 4px 0 13px;
+  color: #5b4850;
+  font-size: 12px;
+}
+.management-task-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) repeat(2, minmax(190px, 1fr));
+  gap: 18px;
+}
+.management-task {
+  min-width: 0;
+}
+.management-task + .management-task {
+  padding-left: 18px;
+  border-left: 1px solid var(--border);
+}
+.management-task h3 {
+  margin: 0 0 7px;
+  font-size: 16px;
+}
+.management-task > p {
+  min-height: 36px;
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.management-task .header-actions {
+  flex-wrap: wrap;
+}
+.management-task .btn {
+  min-height: 42px;
+}
+#managementBatchAction {
+  margin-top: 10px;
+}
+#managementBatchAction .btn {
+  width: 100%;
+  min-height: 40px;
+  font-size: 11px;
+}
+.management-indicators {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-block: 1px solid var(--border);
+}
+.management-kpi {
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.management-kpi + .management-kpi {
+  border-left: 1px solid var(--border);
+}
+.management-kpi strong {
+  margin: 3px 0;
+  color: var(--text);
+  font-size: 17px;
+}
+.management-kpi span,
+.management-kpi small {
+  font-size: 10.5px;
+}
+.management-disclosure {
+  padding: 0;
+  overflow: hidden;
+}
+.management-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+  padding: 16px clamp(18px, 2.5vw, 28px);
+  cursor: pointer;
+}
+.management-disclosure > summary > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+.management-disclosure > summary strong {
+  font-size: 15px;
+}
+.management-disclosure > summary small {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.management-disclosure-meta {
+  flex: 0 0 auto;
+  color: #46616f;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
+}
+.management-disclosure[open] > summary {
+  border-bottom: 1px solid var(--border);
+  background: #fbfcfd;
+}
+.management-disclosure-content {
+  padding: clamp(18px, 2.5vw, 24px) clamp(18px, 2.5vw, 28px) clamp(20px, 2.5vw, 28px);
+}
+.management-disclosure-content > :last-child {
+  margin-bottom: 0;
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .app-tabs {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .app-tabs button {
+    flex: 0 0 auto;
+  }
+  .tab-group-items {
+    flex-wrap: nowrap;
+  }
+  .management-task-grid {
+    grid-template-columns: minmax(240px, 1.15fr) repeat(2, minmax(180px, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .app-tabs {
+    display: none;
+    gap: 8px;
+  }
+  .app-tabs-shell.is-open .app-tabs {
+    display: grid;
+  }
+  .tab-group {
+    display: grid;
+    gap: 5px;
+  }
+  .tab-group-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+  .tab-group-items .app-tabs button,
+  .tab-group-items button {
+    width: 100%;
+  }
+  .management-heading {
+    margin-bottom: 16px;
+  }
+  .management-task-grid,
+  .management-indicators {
+    grid-template-columns: 1fr;
+  }
+  .management-task + .management-task,
+  .management-kpi + .management-kpi {
+    padding-top: 16px;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+  .management-task > p {
+    min-height: 0;
+  }
+  .management-task .header-actions .btn {
+    flex: 1 1 150px;
+  }
+  .management-disclosure > summary {
+    align-items: flex-start;
+    min-height: 0;
+    padding: 15px 13px;
+  }
+  .management-disclosure > summary small {
+    line-height: 1.35;
+  }
+  .management-disclosure-meta {
+    max-width: 92px;
+  }
+  .management-disclosure-content {
+    padding: 16px 13px;
+  }
+}
+@media (max-width: 380px) {
+  .tab-group-items {
+    grid-template-columns: 1fr;
+  }
+  .management-empty-state {
+    padding: 14px;
+  }
+  .management-disclosure-meta {
+    display: none;
+  }
+}
 @media (max-width: 380px) {
   .app-brand h1 {
     font-size: 17px;
@@ -3682,5 +3930,34 @@ summary:focus-visible,
     text-align: center;
     font-size: 11px;
     line-height: 1.2;
+  }
+}
+
+/* Densidade final da Gestão: indicadores informam, sem competir com tarefas. */
+.management-kpi {
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.management-kpi + .management-kpi {
+  border-left: 1px solid var(--border);
+}
+.management-kpi strong {
+  margin: 3px 0;
+  color: var(--text);
+  font-size: 17px;
+}
+.management-kpi span,
+.management-kpi small {
+  font-size: 10.5px;
+}
+@media (max-width: 767px) {
+  .management-kpi + .management-kpi {
+    padding-top: 16px;
+    padding-left: 14px;
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
 }

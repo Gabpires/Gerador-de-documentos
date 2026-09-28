@@ -20,6 +20,19 @@ async function selecionarAba(page, name) {
   await page.getByRole('tab', { name }).click();
 }
 
+function estadoGestao(overrides = {}) {
+  return {
+    counters: {}, documentCounters: {}, history: [], documents: [], draftDocuments: [], templates: [], contacts: [], clients: [], draft: null, management: {},
+    meta: { schemaVersion: 11, lastBackupAt: '', installationId: 'fase-2-testes', defaultOperator: 'Sandra Marcondes da Silva Alves', templateEngineMigration: 1, resourceTemplateMigration: 1 },
+    ...overrides
+  };
+}
+
+async function carregarEstadoGestao(page, state) {
+  await page.addInitScript(({ key, value }) => localStorage.setItem(key, JSON.stringify(value)), { key: storageKey, value: state });
+  await page.reload();
+}
+
 async function preencherReciboValido(page) {
   await selecionarAba(page, /Novo documento/i);
   await page.locator('#tenant').fill('Maria da Silva');
@@ -57,6 +70,77 @@ test('carrega o gerador com a gestão como centro de navegação', async ({ page
 
   await selecionarAba(page, /Backup e segurança/i);
   await expect(page.locator('#view-safety')).toBeVisible();
+});
+
+test('orienta a Gestão vazia para a primeira emissão', async ({ page }) => {
+  await expect(page.locator('#managementEmptyState')).toBeVisible();
+  await expect(page.locator('#managementEmptyState')).toContainText('Comece pela próxima emissão');
+  await expect(page.locator('#advancedSearchDetails')).not.toHaveAttribute('open', '');
+
+  await page.locator('#managementEmptyIssueBtn').click();
+  await expect(page.locator('#view-new')).toBeVisible();
+  await expect(page.locator('#tenant')).toBeFocused();
+});
+
+test('prioriza um rascunho antes das ferramentas avançadas', async ({ page }) => {
+  await carregarEstadoGestao(page, estadoGestao({
+    draft: { amount: '950,00', tenant: 'Pessoa de Rascunho', cpf: '52998224725', property: 'Imóvel fictício do rascunho', contractCode: 'LOC-RASC-01', dueDay: '10', reference: '2026-09', payment: 'Pix', receiptDate: '2026-09-25', operator: 'Sandra Marcondes da Silva Alves', savedAt: '2026-09-25T10:00:00.000Z' }
+  }));
+
+  await expect(page.locator('#managementContinue')).toContainText('Recibo em rascunho');
+  await expect(page.locator('#advancedSearchDetails')).not.toHaveAttribute('open', '');
+  await page.getByRole('button', { name: /Continuar Recibo em rascunho/i }).click();
+  await expect(page.locator('#view-new')).toBeVisible();
+  await expect(page.locator('#tenant')).toHaveValue('Pessoa de Rascunho');
+});
+
+test('mostra documentos que exigem situação antes da busca avançada', async ({ page }) => {
+  await carregarEstadoGestao(page, estadoGestao({
+    history: [{ number: '01/2026', year: 2026, amount: 950, tenant: 'Pessoa Pendente', cpf: '52998224725', property: 'Imóvel fictício pendente', contractCode: 'LOC-PEND-01', dueDay: 10, reference: '2026-09', payment: 'Pix', receiptDate: '2026-09-25', operator: 'Sandra Marcondes da Silva Alves', status: 'awaiting_signature', createdAt: '2026-09-25T10:00:00.000Z' }]
+  }));
+
+  await expect(page.locator('#managementPending')).toContainText('Recibo 01/2026');
+  await expect(page.locator('#managementPending')).toContainText('Aguardando assinatura');
+  await expect(page.locator('#advancedSearchDetails')).not.toHaveAttribute('open', '');
+});
+
+test('oferece emissão em lote quando há dossiê apto', async ({ page }) => {
+  await carregarEstadoGestao(page, estadoGestao({
+    management: { dossiers: [{ id: 'dos-apto-fase2', property: 'Imóvel fictício para lote', contractCode: 'LOC-LOTE-FASE2', tenant: 'Pessoa do Lote', tenantDocument: '52998224725', amount: 950, payment: 'Pix', dueDay: 10, status: 'active', tags: [], checklist: {} }] }
+  }));
+
+  await expect(page.getByRole('button', { name: /Preparar emissão em lote \(1\)/i })).toBeVisible();
+  await page.getByRole('button', { name: /Preparar emissão em lote \(1\)/i }).click();
+  await expect(page.locator('#batchCard')).toHaveAttribute('open', '');
+  await expect(page.locator('#batchDossierList')).toContainText('Imóvel fictício para lote');
+});
+
+test('recolhe a busca avançada sem descartar filtros preenchidos', async ({ page }) => {
+  await page.locator('#advancedSearchDetails > summary').click();
+  await page.locator('#advancedSearch').fill('filtro preservado');
+  await page.locator('#advancedStatus').selectOption('review');
+  await page.locator('#advancedSearchDetails > summary').click();
+  await expect(page.locator('#advancedSearchDetails')).not.toHaveAttribute('open', '');
+
+  await page.locator('#advancedSearchDetails > summary').click();
+  await expect(page.locator('#advancedSearch')).toHaveValue('filtro preservado');
+  await expect(page.locator('#advancedStatus')).toHaveValue('review');
+});
+
+test('mantém os oito destinos acessíveis no menu móvel em 767 px e 380 px', async ({ page }) => {
+  for (const width of [767, 380]) {
+    await page.setViewportSize({ width, height: 844 });
+    const menu = page.locator('#appMenuToggle');
+    await expect(menu).toBeVisible();
+    await menu.click();
+    await expect(page.getByRole('tab')).toHaveCount(8);
+    await page.getByRole('tab', { name: /Dossiês/i }).click();
+    await expect(page.locator('#tab-management')).toHaveAttribute('aria-selected', 'false');
+    await expect(page.locator('#tab-management')).toHaveAttribute('tabindex', '-1');
+    await expect(page.locator('#tab-dossiers')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#tab-dossiers')).toHaveAttribute('tabindex', '0');
+    await expect(page.locator('#view-dossiers')).toBeVisible();
+  }
 });
 
 test('valida os dados obrigatórios antes de emitir um recibo', async ({ page }) => {
@@ -437,6 +521,7 @@ test('valida, emite em lote e registra a situação no dossiê', async ({ page }
   await page.getByRole('button', { name: 'Salvar dossiê' }).click();
 
   await selecionarAba(page, /Gestão/i);
+  await page.locator('#batchCard > summary').click();
   for (const checkbox of await page.locator('#batchDossierList input').all()) await checkbox.check();
   await page.locator('#buildBatchBtn').click();
   await expect(page.locator('#batchPreview')).toContainText('R$ 950,00');
@@ -482,6 +567,7 @@ test('bloqueia o lote inteiro quando um dos dossiês é inválido', async ({ pag
   await page.getByRole('button', { name: 'Salvar dossiê' }).click();
 
   await selecionarAba(page, /Gestão/i);
+  await page.locator('#batchCard > summary').click();
   for (const checkbox of await page.locator('#batchDossierList input').all()) await checkbox.check();
   await page.locator('#buildBatchBtn').click();
 
@@ -606,23 +692,24 @@ test('navega por todas as abas, inclusive Gestão e Dossiês, com setas, Home e 
 
   await management.focus();
   await page.keyboard.press('ArrowRight');
-  await expect(create).toBeFocused();
-  await expect(page.locator('#view-new')).toBeVisible();
-  await page.keyboard.press('ArrowRight');
   await expect(dossiers).toBeFocused();
   await expect(page.locator('#view-dossiers')).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: /Histórico/i })).toBeFocused();
+  await expect(page.locator('#view-history')).toBeVisible();
   await page.keyboard.press('End');
   await expect(safety).toBeFocused();
   await expect(page.locator('#view-safety')).toBeVisible();
   await page.keyboard.press('Home');
-  await expect(management).toBeFocused();
-  await expect(page.locator('#view-management')).toBeVisible();
+  await expect(create).toBeFocused();
+  await expect(page.locator('#view-new')).toBeVisible();
 });
 
 test('salva uma visão por modal próprio sem abrir diálogo nativo', async ({ page }) => {
   const nativeDialogs = [];
   page.on('dialog', dialog => nativeDialogs.push(dialog.type()));
   await selecionarAba(page, /Gestão/i);
+  await page.locator('#advancedSearchDetails > summary').click();
   await page.locator('#advancedSearch').fill('contrato de teste');
   const trigger = page.locator('#saveViewBtn');
   await trigger.click();
@@ -671,6 +758,7 @@ test('configura o bloqueio local em um único modal validado e cancelável', asy
   const nativeDialogs = [];
   page.on('dialog', dialog => nativeDialogs.push(dialog.type()));
   await selecionarAba(page, /Gestão/i);
+  await page.locator('#governanceDetails > summary').click();
   const trigger = page.getByRole('button', { name: 'Configurar bloqueio local' });
   await trigger.click();
   await expect(page.getByRole('heading', { name: 'Configurar bloqueio local' })).toBeVisible();
