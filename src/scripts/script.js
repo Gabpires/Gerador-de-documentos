@@ -30,7 +30,10 @@
   let historyPage = 1;
   let draftDirty = false;
   let toastTimer;
-  let lastModalTrigger = null;
+  let activeActionDialog = null;
+  let pendingModalTrigger = null;
+  const modalStack = [];
+  const modalState = new Map();
   let currentView = 'new';
   let editingContactId = '';
   let editingClientId = '';
@@ -40,6 +43,7 @@
   let genericDirty = false;
 
   function statusRegistro(r) { return r && DOCUMENT_STATUSES.includes(r.status) ? r.status : 'issued'; }
+  function clean(value) { return String(value ?? '').trim(); }
   function normalizarTexto(v) {
     return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   }
@@ -418,12 +422,14 @@
     baixarBlob(new Blob([recoveryRaw], { type: 'application/json' }), 'dados-corrompidos-recibos-' + hoje() + '.json');
     toast('Cópia dos dados corrompidos baixada para análise.');
   }
-  function iniciarHistoricoVazio() {
-    if (!storageCorrupted || !confirm('Isso substituirá os dados locais corrompidos por um histórico vazio. Confirma?')) return;
+  async function iniciarHistoricoVazio() {
+    if (!storageCorrupted) return;
+    const confirmed = await solicitarAcao({ title: 'Iniciar histórico vazio?', description: 'Os dados locais corrompidos serão substituídos. Baixe antes a cópia para recuperação se ainda precisar analisá-los.', confirmLabel: 'Iniciar histórico vazio', danger: true });
+    if (!confirmed) return;
     localStorage.removeItem(KEY); storageCorrupted = false; recoveryRaw = '';
     state = { counters: {}, documentCounters: {}, history: [], documents: [], draftDocuments: [], templates: [], contacts: [], clients: [], draft: null, management: {}, meta: metaNormalizada({}) };
     persistir(state); activeRecord = null; draftDirty = false; historyPage = 1;
-    limpar(); renderHistorico(); atualizar(); toast('Novo histórico iniciado.');
+    await limpar(); renderHistorico(); atualizar(); toast('Novo histórico iniciado.');
   }
   function atualizar() {
     const d = activeRecord || dadosFormulario();
@@ -499,7 +505,7 @@
     const tab = $('tab-' + nome), panel = $('view-' + nome); if (!tab || !panel) return; currentView = nome;
     document.querySelectorAll('.app-tabs [role="tab"]').forEach(item => { const ativo = item === tab; item.setAttribute('aria-selected', ativo ? 'true' : 'false'); item.tabIndex = ativo ? 0 : -1; });
     document.querySelectorAll('.view-panel').forEach(item => { const ativo = item === panel; item.hidden = !ativo; item.classList.toggle('is-active', ativo); }); fecharMenuApp(); fecharPreview();
-    if (nome === 'history') renderHistorico(); if (nome === 'contacts') renderGerenciadorCadastros(); if (nome === 'clients') renderGerenciadorClientes(); if (nome === 'templates') renderModelos(); if (nome === 'safety') { atualizarBackupStatus(); atualizarVisaoSeguranca(); } if (nome === 'new') setTimeout(ajustarAlturaMobile, 0); if (focar) tab.focus(); window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (nome === 'history') renderHistorico(); if (nome === 'contacts') renderGerenciadorCadastros(); if (nome === 'clients') renderGerenciadorClientes(); if (nome === 'templates') renderModelos(); if (nome === 'safety') { atualizarBackupStatus(); atualizarVisaoSeguranca(); } if (nome === 'new') setTimeout(ajustarAlturaMobile, 0); if (focar) tab.focus(); document.dispatchEvent(new CustomEvent('app:viewchange', { detail: { view: nome } })); window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
   function abrirPreview() { document.body.classList.add('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'true'); setTimeout(() => { ajustarAlturaMobile(); $(currentDocumentType === 'receipt' ? 'previewCloseBtn' : 'genericPreviewCloseBtn').focus(); }, 0); }
   function fecharPreview() { const aberta = document.body.classList.contains('preview-open'); document.body.classList.remove('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'false'); if (aberta) setTimeout(ajustarAlturaMobile, 0); }
@@ -552,8 +558,8 @@
     if (!lista.length) { const vazio = document.createElement('div'); vazio.className = 'empty-state'; vazio.textContent = state.contacts.length ? 'Nenhum cadastro corresponde aos filtros.' : 'Nenhum cadastro salvo. Use “Novo cadastro” para começar.'; box.appendChild(vazio); return; }
     lista.forEach(c => { const card = document.createElement('article'); card.className = 'contact-card' + (c.active === false ? ' is-inactive' : ''); const head = document.createElement('div'); head.className = 'contact-card-head'; const titulo = document.createElement('div'), nome = document.createElement('h3'), doc = document.createElement('p'), badge = document.createElement('span'); nome.textContent = c.tenant; doc.className = 'document'; doc.textContent = tipoDocumento(c.cpf) + ' ' + c.cpf; titulo.append(nome, doc); badge.className = 'status-badge' + (c.active === false ? ' canceled' : ''); badge.textContent = c.active === false ? 'Inativo' : 'Ativo'; head.append(titulo, badge); const property = document.createElement('div'); property.className = 'contact-property'; property.textContent = c.property; const meta = document.createElement('div'); meta.className = 'contact-meta'; const linha = (r, v) => { const s = document.createElement('span'), b = document.createElement('b'); b.textContent = r + ': '; s.append(b, document.createTextNode(v)); return s; }; meta.append(linha('Valor', Number(c.amount) > 0 ? moeda(c.amount) : 'não informado'), linha('Pagamento', c.payment), linha('Contrato', (c.contractCode || 'sem código') + (c.dueDay ? ' · vencimento dia ' + c.dueDay : ''))); const actions = document.createElement('div'); actions.className = 'contact-actions'; if (c.active !== false) actions.append(botaoHistorico('Usar no recibo', () => carregarCadastroGerenciado(c.id, false), 'primary')); actions.append(botaoHistorico('Editar', () => carregarCadastroGerenciado(c.id, true)), botaoHistorico(c.active === false ? 'Reativar' : 'Inativar', () => alternarCadastro(c.id), c.active === false ? '' : 'danger')); card.append(head, property, meta, actions); box.appendChild(card); });
   }
-  function carregarCadastroGerenciado(id, edicao) { if (!confirmarDescartarRascunho()) return; const c = state.contacts.find(item => item.id === id); if (!c) return; if (c.active === false && !edicao) { toast('Reative o cadastro antes de usá-lo em um recibo.', true); return; } activeRecord = null; pendingIssue = null; travar(false); mostrarErros({}); if (c.active === false) { $('savedTenant').value = ''; editingContactId = c.id; $('tenant').value = c.tenant || ''; $('cpf').value = mascaraDocumento(c.cpf || ''); $('property').value = c.property || ''; $('amount').value = Number(c.amount) > 0 ? valorCampo(c.amount) : ''; if (pagamentos.includes(c.payment)) $('payment').value = c.payment; $('contractCode').value = c.contractCode || ''; $('dueDay').value = Number(c.dueDay) > 0 ? String(c.dueDay) : '';['amount', 'tenant', 'cpf', 'property', 'contractCode', 'dueDay', 'payment'].forEach(limparErroCampo); draftDirty = true; atualizar(); } else { $('savedTenant').value = id; selecionarCadastro({ currentTarget: $('savedTenant') }); } ativarView('new'); $('savedTenantStatus').textContent = c.active === false ? 'Cadastro inativo aberto somente para edição. Para utilizá-lo, reative-o na tela Cadastros.' : (edicao ? 'Cadastro aberto para edição. Ajuste os dados e clique em “Salvar cadastro”.' : 'Cadastro carregado no novo recibo.'); setTimeout(() => $(edicao ? 'tenant' : 'amount').focus(), 0); }
-  function alternarCadastro(id) { const c = state.contacts.find(item => item.id === id); if (!c) return; const ativar = c.active === false; if (!confirm((ativar ? 'Reativar' : 'Inativar') + ' o cadastro de ' + c.tenant + ' para este imóvel?')) return; const contacts = state.contacts.map(item => item.id === id ? { ...item, active: ativar, updatedAt: new Date().toISOString() } : item); if (!persistir({ ...state, contacts })) return; renderCadastros(); toast('Cadastro ' + (ativar ? 'reativado.' : 'inativado e preservado.')); }
+  async function carregarCadastroGerenciado(id, edicao) { if (!await confirmarDescartarRascunho()) return; const c = state.contacts.find(item => item.id === id); if (!c) return; if (c.active === false && !edicao) { toast('Reative o cadastro antes de usá-lo em um recibo.', true); return; } activeRecord = null; pendingIssue = null; travar(false); mostrarErros({}); if (c.active === false) { $('savedTenant').value = ''; editingContactId = c.id; $('tenant').value = c.tenant || ''; $('cpf').value = mascaraDocumento(c.cpf || ''); $('property').value = c.property || ''; $('amount').value = Number(c.amount) > 0 ? valorCampo(c.amount) : ''; if (pagamentos.includes(c.payment)) $('payment').value = c.payment; $('contractCode').value = c.contractCode || ''; $('dueDay').value = Number(c.dueDay) > 0 ? String(c.dueDay) : '';['amount', 'tenant', 'cpf', 'property', 'contractCode', 'dueDay', 'payment'].forEach(limparErroCampo); draftDirty = true; atualizar(); } else { $('savedTenant').value = id; selecionarCadastro({ currentTarget: $('savedTenant') }); } ativarView('new'); $('savedTenantStatus').textContent = c.active === false ? 'Cadastro inativo aberto somente para edição. Para utilizá-lo, reative-o na tela Cadastros.' : (edicao ? 'Cadastro aberto para edição. Ajuste os dados e clique em “Salvar cadastro”.' : 'Cadastro carregado no novo recibo.'); setTimeout(() => $(edicao ? 'tenant' : 'amount').focus(), 0); }
+  async function alternarCadastro(id) { const c = state.contacts.find(item => item.id === id); if (!c) return; const ativar = c.active === false; const confirmed = await solicitarAcao({ title: `${ativar ? 'Reativar' : 'Inativar'} cadastro?`, description: `${c.tenant} · ${c.property}. O cadastro e os documentos anteriores continuarão preservados.`, confirmLabel: ativar ? 'Reativar cadastro' : 'Inativar cadastro', danger: !ativar }); if (!confirmed) return; const contacts = state.contacts.map(item => item.id === id ? { ...item, active: ativar, updatedAt: new Date().toISOString() } : item); if (!persistir({ ...state, contacts })) return; renderCadastros(); toast('Cadastro ' + (ativar ? 'reativado.' : 'inativado e preservado.')); }
   function selecionarCadastro(evento) {
     const selecionado = evento && evento.currentTarget ? evento.currentTarget.value : $('savedTenant').value;
     const c = state.contacts.find(x => String(x.id) === String(selecionado));
@@ -599,11 +605,12 @@
     $('savedTenantStatus').textContent = permaneceInativo ? 'Cadastro inativo atualizado. Reative-o na tela Cadastros para utilizá-lo.' : 'Cadastro salvo e selecionado: ' + novo.tenant + '.';
     toast(permaneceInativo ? 'Cadastro inativo atualizado sem reativação.' : 'Cadastro salvo para preenchimento rápido.');
   }
-  function excluirCadastro() {
+  async function excluirCadastro() {
     const id = $('savedTenant').value;
     const c = state.contacts.find(x => x.id === id);
     if (!c || activeRecord) return;
-    if (!confirm('Inativar o cadastro de ' + c.tenant + ' para este imóvel? Ele continuará no backup e poderá ser reativado ao salvá-lo novamente.')) return;
+    const confirmed = await solicitarAcao({ title: 'Inativar cadastro?', description: `${c.tenant} · ${c.property}. Ele continuará no backup e poderá ser reativado depois.`, confirmLabel: 'Inativar cadastro', danger: true });
+    if (!confirmed) return;
     const contacts = state.contacts.map(x => x.id === id ? { ...x, active: false, updatedAt: new Date().toISOString() } : x);
     if (!persistir({ ...state, contacts })) return;
     renderCadastros(); toast('Cadastro inativado e preservado no histórico.');
@@ -659,9 +666,10 @@
     const client = state.clients.find(item => item.id === id); if (!client) return;
     editingClientId = client.id; $('clientType').value = client.kind; $('clientName').value = client.name; $('clientDocument').value = client.document; $('clientGender').value = client.gender; $('clientNationality').value = client.nationality; $('clientProfession').value = client.profession; $('clientMaritalStatus').value = client.maritalStatus; $('clientRg').value = client.rg; $('clientRgIssuer').value = client.rgIssuer; $('clientBirthDate').value = client.birthDate; $('clientAddress').value = client.address; $('clientCompanyRegistration').value = client.companyRegistration; $('clientRepresentativeRole').value = client.representativeRole; atualizarCamposCliente(); $('clientRepresentativeId').value = client.representativeId; $('clientFormError').textContent = ''; $('clientSaveBtn').textContent = 'Salvar alterações'; $('clientForm').scrollIntoView({ block: 'start', behavior: 'smooth' }); $('clientName').focus();
   }
-  function alternarCliente(id) {
+  async function alternarCliente(id) {
     const client = state.clients.find(item => item.id === id); if (!client) return; const activate = client.active === false;
-    if (!confirm((activate ? 'Reativar' : 'Inativar') + ' o cliente ' + nomeCliente(client) + '? Documentos já emitidos permanecerão inalterados.')) return;
+    const confirmed = await solicitarAcao({ title: `${activate ? 'Reativar' : 'Inativar'} cliente?`, description: `${nomeCliente(client)}. Documentos já emitidos permanecerão inalterados.`, confirmLabel: activate ? 'Reativar cliente' : 'Inativar cliente', danger: !activate });
+    if (!confirmed) return;
     const clients = state.clients.map(item => item.id === id ? { ...item, active: activate, updatedAt: new Date().toISOString() } : item);
     if (!persistir({ ...state, clients })) return; renderGerenciadorClientes(); atualizarClientesContrato(); atualizarVisaoSeguranca(); toast('Cliente ' + (activate ? 'reativado.' : 'inativado e preservado.'));
   }
@@ -696,11 +704,12 @@
     const contato = state.contacts.find(c => String(c.cpf).replace(/\D/g, '') === String(r.cpf).replace(/\D/g, '') && normalizarTexto(c.property) === normalizarTexto(r.property));
     renderCadastros(contato ? contato.id : '');
   }
-  function confirmarDescartarRascunho() {
-    return !draftDirty || !!activeRecord || confirm('Há alterações ainda não emitidas. Deseja descartá-las?');
+  async function confirmarDescartarRascunho() {
+    if (!draftDirty || activeRecord) return true;
+    return Boolean(await solicitarAcao({ title: 'Descartar alterações do recibo?', description: 'Os dados ainda não emitidos serão removidos. Esta ação não altera documentos já registrados.', confirmLabel: 'Descartar alterações', danger: true }));
   }
-  function limpar() {
-    if (!confirmarDescartarRascunho()) return false;
+  async function limpar() {
+    if (!await confirmarDescartarRascunho()) return false;
     if (!storageCorrupted) persistir({ ...state, draft: null }); activeRecord = null; pendingIssue = null; editingContactId = '';
     travar(false); mostrarErros({});
     $('amount').value = ''; $('tenant').value = ''; $('cpf').value = ''; $('property').value = '';
@@ -709,19 +718,19 @@
     $('operator').value = state.meta.defaultOperator || operadores[0]; draftDirty = false;
     renderCadastros(); atualizar(); $('amount').focus(); return true;
   }
-  function criarRascunhoDe(r, avancarMes = false) {
-    if (!confirmarDescartarRascunho()) return;
+  async function criarRascunhoDe(r, avancarMes = false) {
+    if (!await confirmarDescartarRascunho()) return false;
     if (!storageCorrupted) persistir({ ...state, draft: null }); activeRecord = null; pendingIssue = null; editingContactId = ''; travar(false); mostrarErros({});
     preencherFormulario({ ...r, reference: avancarMes ? proximoMes(r.reference) : r.reference, receiptDate: hoje() });
     draftDirty = true; atualizar(); $('amount').focus();
-    toast(avancarMes ? 'Rascunho do próximo mês criado. Confira antes de emitir.' : 'Recibo duplicado como novo rascunho. Confira antes de emitir.');
+    toast(avancarMes ? 'Rascunho do próximo mês criado. Confira antes de emitir.' : 'Recibo duplicado como novo rascunho. Confira antes de emitir.'); return true;
   }
   function duplicar() { if (activeRecord) criarRascunhoDe(activeRecord, false); }
   function gerarProximoMes() { if (activeRecord) criarRascunhoDe(activeRecord, true); }
   function botaoHistorico(label, acao, classe = '') {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
     if (classe) b.className = classe;
-    b.addEventListener('click', evento => { const menu = b.closest('.history-menu'); if (menu) menu.open = false; acao(evento); }); return b;
+    b.addEventListener('click', evento => { const menu = b.closest('.history-menu'); if (menu) menu.open = false; pendingModalTrigger = b; try { acao(evento); } finally { queueMicrotask(() => { if (pendingModalTrigger === b) pendingModalTrigger = null; }); } }); return b;
   }
   function rotuloTipo(tipo) { return DOCUMENT_TYPES[tipo] ? DOCUMENT_TYPES[tipo].label : (tipo === 'custom' ? 'Documento livre' : 'Documento'); }
   function statusDocumento(r) { return DOCUMENT_STATUSES.includes(r && r.status) ? r.status : 'issued'; }
@@ -742,8 +751,8 @@
   function aplicarCadastroDocumento() { const c = state.contacts.find(x => x.id === $('docQuickContact').value && x.active !== false); if (!c) return; if (currentDocumentType === 'declaration') { $('docDeclarant').value = c.tenant; $('docDeclarantDocument').value = c.cpf; } else if (currentDocumentType === 'term') { $('docPartyOne').value = c.tenant; $('docPartyOneDocument').value = c.cpf; $('docProperty').value = c.property; } else if (currentDocumentType === 'contract') { const sub = $('docContractSubtype').value; if (sub === 'sale') { $('docBuyer').value = c.tenant; $('docBuyerDocument').value = c.cpf; } else { $('docTenantParty').value = c.tenant; $('docTenantPartyDocument').value = c.cpf; } $('docContractProperty').value = c.property; } genericDirty = true; atualizarDocumentoGenerico(); toast('Cadastro ativo aplicado ao documento.'); }
   function atualizarOpcoesModelos() { const sel = $('docTemplate'), atual = sel.value; sel.replaceChildren(); const padrao = document.createElement('option'); padrao.value = ''; padrao.textContent = 'Modelo padrão'; sel.appendChild(padrao); state.templates.filter(t => t.active !== false && t.type === currentDocumentType).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).forEach(t => { const op = document.createElement('option'); op.value = t.id; op.textContent = t.name; sel.appendChild(op); }); sel.value = state.templates.some(t => t.id === atual && t.active !== false && t.type === currentDocumentType) ? atual : ''; }
   function aplicarModeloSelecionado() { const t = state.templates.find(x => x.id === $('docTemplate').value && x.active !== false); if (!t) return; preencherCamposGenericos({ ...t.fields, docDate: hoje(), docOperator: state.meta.defaultOperator || operadores[0] }); genericDirty = true; atualizarDocumentoGenerico(); toast('Modelo “' + t.name + '” aplicado.'); }
-  function limparDocumentoGenerico({ preservarTipo = true } = {}) { if (genericDirty && !activeGenericRecord && !confirm('Há alterações não salvas neste documento. Deseja descartá-las?')) return false; activeGenericRecord = null; editingGenericDraftId = ''; genericDirty = false; camposGenericosElementos().forEach(el => { if (el.type === 'checkbox') el.checked = false; else el.value = ''; }); document.querySelectorAll('[data-clause]').forEach(el => el.checked = false); $('docDate').value = hoje(); $('docCity').value = 'Araçariguama/SP'; $('docOperator').value = state.meta.defaultOperator || operadores[0]; $('docLetterhead').value = 'none'; $('docFooterEnabled').checked = false; $('docTermSubtype').value = 'general'; $('docContractSubtype').value = 'lease'; $('docTitle').value = tituloPadraoDocumento(currentDocumentType); $('docQuickContact').value = ''; $('docTemplate').value = ''; limparErrosGenericos(); travarDocumentoGenerico(false); atualizarCamposCondicionais(); atualizarDocumentoGenerico(); return true; }
-  function selecionarTipoDocumento(tipo, { ignorarConfirmacao = false } = {}) { if (!DOCUMENT_TYPES[tipo]) return; if (!ignorarConfirmacao && tipo !== currentDocumentType && ((currentDocumentType === 'receipt' && draftDirty && !activeRecord) || (currentDocumentType !== 'receipt' && genericDirty && !activeGenericRecord)) && !confirm('Há alterações não salvas. Deseja trocar o tipo de documento?')) return; currentDocumentType = tipo; document.querySelectorAll('[data-document-type]').forEach(b => b.setAttribute('aria-pressed', b.dataset.documentType === tipo ? 'true' : 'false')); $('receiptEditor').hidden = tipo !== 'receipt'; $('genericEditor').hidden = tipo === 'receipt'; $('receiptPreviewArea').hidden = tipo !== 'receipt'; $('genericPreviewArea').hidden = tipo === 'receipt'; $('editorTitle').textContent = tipo === 'receipt' ? 'Novo recibo' : 'Novo ' + rotuloTipo(tipo).toLowerCase(); $('editorSubtitle').textContent = tipo === 'receipt' ? 'Preencha, revise a prévia e confirme a emissão.' : 'Preencha os campos específicos, escolha o timbre e confira a prévia.'; if (tipo !== 'receipt') { if (!activeGenericRecord || activeGenericRecord.type !== tipo) { activeGenericRecord = null; editingGenericDraftId = ''; genericDirty = false; limparDocumentoGenerico({ preservarTipo: true }); } atualizarCamposCondicionais(); atualizarCadastrosDocumento(); atualizarDocumentoGenerico(); } else { atualizar(); } ajustarAlturaMobile(); }
+  async function limparDocumentoGenerico({ preservarTipo = true, ignorarConfirmacao = false } = {}) { if (!ignorarConfirmacao && genericDirty && !activeGenericRecord) { const confirmed = await solicitarAcao({ title: 'Descartar alterações do documento?', description: 'Os dados ainda não salvos serão removidos. Documentos já registrados permanecem inalterados.', confirmLabel: 'Descartar alterações', danger: true }); if (!confirmed) return false; } activeGenericRecord = null; editingGenericDraftId = ''; genericDirty = false; camposGenericosElementos().forEach(el => { if (el.type === 'checkbox') el.checked = false; else el.value = ''; }); document.querySelectorAll('[data-clause]').forEach(el => el.checked = false); $('docDate').value = hoje(); $('docCity').value = 'Araçariguama/SP'; $('docOperator').value = state.meta.defaultOperator || operadores[0]; $('docLetterhead').value = 'none'; $('docFooterEnabled').checked = false; $('docTermSubtype').value = 'general'; $('docContractSubtype').value = 'lease'; $('docTitle').value = tituloPadraoDocumento(currentDocumentType); $('docQuickContact').value = ''; $('docTemplate').value = ''; limparErrosGenericos(); travarDocumentoGenerico(false); atualizarCamposCondicionais(); atualizarDocumentoGenerico(); return true; }
+  async function selecionarTipoDocumento(tipo, { ignorarConfirmacao = false } = {}) { if (!DOCUMENT_TYPES[tipo]) return false; const hasPendingChanges = tipo !== currentDocumentType && ((currentDocumentType === 'receipt' && draftDirty && !activeRecord) || (currentDocumentType !== 'receipt' && genericDirty && !activeGenericRecord)); if (!ignorarConfirmacao && hasPendingChanges) { const confirmed = await solicitarAcao({ title: 'Trocar o tipo de documento?', description: 'As alterações ainda não salvas no documento atual serão descartadas.', confirmLabel: 'Trocar e descartar', danger: true }); if (!confirmed) return false; } currentDocumentType = tipo; document.querySelectorAll('[data-document-type]').forEach(b => b.setAttribute('aria-pressed', b.dataset.documentType === tipo ? 'true' : 'false')); $('receiptEditor').hidden = tipo !== 'receipt'; $('genericEditor').hidden = tipo === 'receipt'; $('receiptPreviewArea').hidden = tipo !== 'receipt'; $('genericPreviewArea').hidden = tipo === 'receipt'; $('editorTitle').textContent = tipo === 'receipt' ? 'Novo recibo' : 'Novo ' + rotuloTipo(tipo).toLowerCase(); $('editorSubtitle').textContent = tipo === 'receipt' ? 'Preencha, revise a prévia e confirme a emissão.' : 'Preencha os campos específicos, escolha o timbre e confira a prévia.'; if (tipo !== 'receipt') { if (!activeGenericRecord || activeGenericRecord.type !== tipo) { activeGenericRecord = null; editingGenericDraftId = ''; genericDirty = false; limparDocumentoGenerico({ preservarTipo: true, ignorarConfirmacao: true }); } atualizarCamposCondicionais(); atualizarCadastrosDocumento(); atualizarDocumentoGenerico(); } else { atualizar(); } ajustarAlturaMobile(); return true; }
   function adicionarTexto(container, texto, classe = '') { if (!String(texto || '').trim()) return; const p = document.createElement('p'); if (classe) p.className = classe; p.textContent = String(texto).trim(); container.appendChild(p); }
   function adicionarBloco(container, linhas) { const bloco = document.createElement('div'); bloco.className = 'data-block'; linhas.filter(x => x && String(x).trim()).forEach(x => adicionarTexto(bloco, x)); if (bloco.children.length) container.appendChild(bloco); }
   function adicionarTituloSecao(container, texto) { const h = document.createElement('h2'); h.textContent = texto; container.appendChild(h); }
@@ -996,16 +1005,34 @@
   }
   function carregarDocumentoGenerico(r, { duplicar = false } = {}) { if (!r) return false; currentDocumentType = r.type; selecionarTipoDocumento(r.type, { ignorarConfirmacao: true }); activeGenericRecord = duplicar || r.status === 'draft' ? null : Object.freeze({ ...r }); editingGenericDraftId = r.status === 'draft' && !duplicar ? r.id : ''; preencherCamposGenericos({ ...r.fields, docDate: duplicar ? hoje() : r.fields.docDate }); if (duplicar) { editingGenericDraftId = ''; genericDirty = true; } else genericDirty = false; travarDocumentoGenerico(!!activeGenericRecord); ativarView('new'); atualizarDocumentoGenerico(); toast(duplicar ? 'Documento duplicado como novo rascunho.' : (r.status === 'draft' ? 'Rascunho carregado para edição.' : rotuloTipo(r.type) + ' ' + r.number + ' carregado.')); return true; }
   function duplicarDocumentoGenerico() { if (activeGenericRecord) carregarDocumentoGenerico(activeGenericRecord, { duplicar: true }); }
-  function cancelarDocumentoGenerico(id) { state = lerEstado(); const r = state.documents.find(x => x.id === id); if (!r || r.status === 'canceled') return; const motivo = prompt('Informe o motivo do cancelamento de ' + r.number + ':'); if (motivo === null) return; if (motivo.trim().length < 3) { toast('Informe um motivo com pelo menos 3 caracteres.', true); return; } const agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'canceled', cancelReason: motivo.trim(), canceledAt: agora, canceledBy: state.meta.defaultOperator || operadores[0], updatedAt: agora } : x); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(x => x.id === id) }); renderHistorico(); atualizarDocumentoGenerico(); toast('Documento cancelado e preservado no histórico.'); }
-  function arquivarDocumentoGenerico(id) { state = lerEstado(); const r = state.documents.find(x => x.id === id); if (!r || !confirm('Arquivar ' + r.number + '? O documento continuará disponível no histórico.')) return; const agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'archived', archivedAt: agora, updatedAt: agora } : x); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(x => x.id === id) }); renderHistorico(); atualizarDocumentoGenerico(); toast('Documento arquivado.'); }
-  function cancelarDocumentoDinamico(id) { state = lerEstado(); const atual = state.documents.find(x => x.id === id && x.dynamic); if (!atual || atual.status !== 'issued') return; const motivo = prompt('Informe o motivo do cancelamento:'); if (motivo === null) return; if (motivo.trim().length < 3) { toast('Informe um motivo com ao menos 3 caracteres.', true); return; } const agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'canceled', cancelReason: motivo.trim(), canceledAt: agora, canceledBy: state.meta.defaultOperator || operadores[0], updatedAt: agora } : x); if (persistir({ ...state, documents })) { renderHistorico(); toast('Documento dinâmico cancelado e preservado.'); } }
-  function arquivarDocumentoDinamico(id) { state = lerEstado(); const atual = state.documents.find(x => x.id === id && x.dynamic); if (!atual || !confirm('Arquivar este documento? Ele continuará disponível no histórico.')) return; const agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'archived', archivedAt: agora, updatedAt: agora } : x); if (persistir({ ...state, documents })) { renderHistorico(); toast('Documento dinâmico arquivado.'); } }
-  function excluirRascunhoGenerico(id) { if (!confirm('Excluir este rascunho?')) return; const drafts = state.draftDocuments.filter(x => x.id !== id); if (!persistir({ ...state, draftDocuments: drafts })) return; if (editingGenericDraftId === id) { editingGenericDraftId = ''; genericDirty = false; } renderHistorico(); atualizarVisaoSeguranca(); toast('Rascunho excluído.'); }
+  async function cancelarDocumentoGenerico(id) { state = lerEstado(); const r = state.documents.find(x => x.id === id); if (!r || r.status === 'canceled') return; const result = await solicitarAcao({ title: `Cancelar ${r.number}?`, description: 'O número continuará reservado e o documento será preservado no histórico.', confirmLabel: 'Confirmar cancelamento', danger: true, fields: [{ name: 'reason', label: 'Motivo do cancelamento', type: 'textarea', maxLength: 500, placeholder: 'Informe por que o documento está sendo cancelado' }], validate: values => clean(values.reason).length >= 3 ? { ok: true } : { ok: false, fieldErrors: { reason: 'Informe um motivo com pelo menos 3 caracteres.' } } }); if (!result) return; const motivo = clean(result.reason), agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'canceled', cancelReason: motivo, canceledAt: agora, canceledBy: state.meta.defaultOperator || operadores[0], updatedAt: agora } : x); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(x => x.id === id) }); renderHistorico(); atualizarDocumentoGenerico(); toast('Documento cancelado e preservado no histórico.'); }
+  async function arquivarDocumentoGenerico(id) { state = lerEstado(); const r = state.documents.find(x => x.id === id); if (!r) return; const confirmed = await solicitarAcao({ title: `Arquivar ${r.number}?`, description: 'O documento continuará disponível no histórico e poderá ser consultado.', confirmLabel: 'Arquivar documento' }); if (!confirmed) return; const agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'archived', archivedAt: agora, updatedAt: agora } : x); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(x => x.id === id) }); renderHistorico(); atualizarDocumentoGenerico(); toast('Documento arquivado.'); }
+  async function cancelarDocumentoDinamico(id) { state = lerEstado(); const atual = state.documents.find(x => x.id === id && x.dynamic); if (!atual || atual.status !== 'issued') return; const result = await solicitarAcao({ title: 'Cancelar documento?', description: 'O documento dinâmico continuará preservado no histórico.', confirmLabel: 'Confirmar cancelamento', danger: true, fields: [{ name: 'reason', label: 'Motivo do cancelamento', type: 'textarea', maxLength: 500 }], validate: values => clean(values.reason).length >= 3 ? { ok: true } : { ok: false, fieldErrors: { reason: 'Informe um motivo com pelo menos 3 caracteres.' } } }); if (!result) return; const motivo = clean(result.reason), agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'canceled', cancelReason: motivo, canceledAt: agora, canceledBy: state.meta.defaultOperator || operadores[0], updatedAt: agora } : x); if (persistir({ ...state, documents })) { renderHistorico(); toast('Documento dinâmico cancelado e preservado.'); } }
+  async function arquivarDocumentoDinamico(id) { state = lerEstado(); const atual = state.documents.find(x => x.id === id && x.dynamic); if (!atual) return; const confirmed = await solicitarAcao({ title: 'Arquivar documento?', description: 'Ele continuará disponível no histórico para consulta.', confirmLabel: 'Arquivar documento' }); if (!confirmed) return; const agora = new Date().toISOString(), documents = state.documents.map(x => x.id === id ? { ...x, status: 'archived', archivedAt: agora, updatedAt: agora } : x); if (persistir({ ...state, documents })) { renderHistorico(); toast('Documento dinâmico arquivado.'); } }
+  async function excluirRascunhoGenerico(id) { const confirmed = await solicitarAcao({ title: 'Excluir rascunho?', description: 'As alterações deste rascunho serão removidas e não poderão ser recuperadas.', confirmLabel: 'Excluir rascunho', danger: true }); if (!confirmed) return; const drafts = state.draftDocuments.filter(x => x.id !== id); if (!persistir({ ...state, draftDocuments: drafts })) return; if (editingGenericDraftId === id) { editingGenericDraftId = ''; genericDirty = false; } renderHistorico(); atualizarVisaoSeguranca(); toast('Rascunho excluído.'); }
   function nomeArquivoDocumento(r) { const nome = normalizarTexto(nomePrincipalDocumento(r)).split(' ').filter(Boolean).slice(0, 4).map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('_') || 'Documento'; return rotuloTipo(r.type).replace(/ç/g, 'c').replace(/ã/g, 'a') + '_' + (r.status === 'canceled' ? 'CANCELADO_' : '') + String(r.number || 'Rascunho').replace('/', '-') + '_' + nome; }
   function registrarImpressaoDocumento(id) { state = lerEstado(); const agora = new Date().toISOString(), documents = state.documents.map(r => r.id === id ? { ...r, printCount: (Number(r.printCount) || 0) + 1, lastPrintedAt: agora } : r); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(r => r.id === id) }); renderHistorico(); }
   function imprimirDocumentoGenerico() { if (!activeGenericRecord) { toast('Emita e registre o documento antes de imprimir.', true); return; } const anterior = document.title, nome = nomeArquivoDocumento(activeGenericRecord); document.title = nome; document.body.classList.add('printing-generic'); document.documentElement.classList.add('printing-generic'); atualizarDocumentoGenerico(); paginarDocumentoPreview(); let restaurado = false; const restaurar = () => { if (restaurado) return; restaurado = true; document.title = anterior; document.body.classList.remove('printing-generic'); document.documentElement.classList.remove('printing-generic'); }; const id = activeGenericRecord.id; window.addEventListener('afterprint', () => { registrarImpressaoDocumento(id); restaurar(); }, { once: true }); setTimeout(restaurar, 5000); toast('Nome sugerido para o PDF: ' + nome + '.pdf'); window.print(); }
-  function salvarModeloAtual() { if (currentDocumentType === 'receipt') { toast('O recibo possui modelo institucional fixo.', true); return; } const nome = prompt('Nome do novo modelo de ' + rotuloTipo(currentDocumentType).toLowerCase() + ':'); if (nome === null) return; if (nome.trim().length < 3) { toast('Informe um nome com pelo menos 3 caracteres.', true); return; } const agora = new Date().toISOString(), modelo = normalizarModelo({ id: idDocumento(), name: nome.trim(), type: currentDocumentType, fields: coletarCamposGenericos(), active: true, createdAt: agora, updatedAt: agora }); if (!persistir({ ...state, templates: [...state.templates, modelo] })) return; atualizarOpcoesModelos(); $('docTemplate').value = modelo.id; renderModelos(); atualizarVisaoSeguranca(); toast('Modelo personalizado salvo.'); }
-  function renderModelos() { const box = $('templatesList'); if (!box) return; const busca = normalizarTexto($('templatesSearch').value), filtro = $('templatesStatus').value, lista = state.templates.filter(t => (filtro === 'all' || (filtro === 'active' && t.active !== false) || (filtro === 'inactive' && t.active === false)) && (!busca || normalizarTexto(t.name + ' ' + rotuloTipo(t.type)).includes(busca))).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')); $('templatesSummary').innerHTML = '<strong>' + lista.length + '</strong> exibido(s) · <strong>' + state.templates.filter(t => t.active !== false).length + '</strong> ativo(s)'; box.replaceChildren(); if (!lista.length) { const e = document.createElement('div'); e.className = 'empty-state'; e.textContent = state.templates.length ? 'Nenhum modelo corresponde aos filtros.' : 'Nenhum modelo personalizado salvo.'; box.appendChild(e); return; } lista.forEach(t => { const card = document.createElement('article'); card.className = 'template-card' + (t.active === false ? ' is-inactive' : ''); const h = document.createElement('h3'); h.textContent = t.name; const p = document.createElement('p'); p.textContent = rotuloTipo(t.type) + ' · ' + (t.active === false ? 'inativo' : 'ativo') + ' · criado em ' + dataHora(t.createdAt); const actions = document.createElement('div'); actions.className = 'contact-actions'; if (t.active !== false) actions.append(botaoHistorico('Usar modelo', () => { selecionarTipoDocumento(t.type, { ignorarConfirmacao: true }); $('docTemplate').value = t.id; aplicarModeloSelecionado(); ativarView('new'); }, 'primary')); actions.append(botaoHistorico(t.active === false ? 'Reativar' : 'Inativar', () => { const templates = state.templates.map(x => x.id === t.id ? { ...x, active: t.active === false, updatedAt: new Date().toISOString() } : x); if (persistir({ ...state, templates })) { renderModelos(); atualizarOpcoesModelos(); } }, t.active === false ? '' : 'danger'), botaoHistorico('Excluir', () => { if (confirm('Excluir definitivamente o modelo “' + t.name + '”?')) { const templates = state.templates.filter(x => x.id !== t.id); if (persistir({ ...state, templates })) { renderModelos(); atualizarOpcoesModelos(); atualizarVisaoSeguranca(); } } }, 'danger')); card.append(h, p, actions); box.appendChild(card); }); }
+  async function salvarModeloAtual() { if (currentDocumentType === 'receipt') { toast('O recibo possui modelo institucional fixo.', true); return; } const result = await solicitarAcao({ title: 'Salvar modelo personalizado', description: `Dê um nome claro ao novo modelo de ${rotuloTipo(currentDocumentType).toLowerCase()}.`, confirmLabel: 'Salvar modelo', fields: [{ name: 'name', label: 'Nome do modelo', maxLength: 120 }], validate: values => clean(values.name).length >= 3 ? { ok: true } : { ok: false, fieldErrors: { name: 'Informe um nome com pelo menos 3 caracteres.' } } }); if (!result) return; const agora = new Date().toISOString(), modelo = normalizarModelo({ id: idDocumento(), name: clean(result.name), type: currentDocumentType, fields: coletarCamposGenericos(), active: true, createdAt: agora, updatedAt: agora }); if (!persistir({ ...state, templates: [...state.templates, modelo] })) return; atualizarOpcoesModelos(); $('docTemplate').value = modelo.id; renderModelos(); atualizarVisaoSeguranca(); toast('Modelo personalizado salvo.'); }
+  function renderModelos() {
+    const box = $('templatesList'); if (!box) return;
+    const busca = normalizarTexto($('templatesSearch').value), filtro = $('templatesStatus').value;
+    const lista = state.templates.filter(t => (filtro === 'all' || (filtro === 'active' && t.active !== false) || (filtro === 'inactive' && t.active === false)) && (!busca || normalizarTexto(t.name + ' ' + rotuloTipo(t.type)).includes(busca))).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    $('templatesSummary').innerHTML = '<strong>' + lista.length + '</strong> exibido(s) · <strong>' + state.templates.filter(t => t.active !== false).length + '</strong> ativo(s)'; box.replaceChildren();
+    if (!lista.length) { const empty = document.createElement('div'); empty.className = 'empty-state'; empty.textContent = state.templates.length ? 'Nenhum modelo corresponde aos filtros.' : 'Nenhum modelo personalizado salvo.'; box.appendChild(empty); return; }
+    lista.forEach(template => {
+      const card = document.createElement('article'); card.className = 'template-card' + (template.active === false ? ' is-inactive' : '');
+      const heading = document.createElement('h3'); heading.textContent = template.name;
+      const description = document.createElement('p'); description.textContent = rotuloTipo(template.type) + ' · ' + (template.active === false ? 'inativo' : 'ativo') + ' · criado em ' + dataHora(template.createdAt);
+      const actions = document.createElement('div'); actions.className = 'contact-actions';
+      if (template.active !== false) actions.append(botaoHistorico('Usar modelo', () => { selecionarTipoDocumento(template.type, { ignorarConfirmacao: true }); $('docTemplate').value = template.id; aplicarModeloSelecionado(); ativarView('new'); }, 'primary'));
+      actions.append(
+        botaoHistorico(template.active === false ? 'Reativar' : 'Inativar', () => { const templates = state.templates.map(item => item.id === template.id ? { ...item, active: template.active === false, updatedAt: new Date().toISOString() } : item); if (persistir({ ...state, templates })) { renderModelos(); atualizarOpcoesModelos(); } }, template.active === false ? '' : 'danger'),
+        botaoHistorico('Excluir', async () => { const confirmed = await solicitarAcao({ title: 'Excluir modelo definitivamente?', description: `“${template.name}” será removido dos modelos personalizados. Documentos já emitidos permanecem inalterados.`, confirmLabel: 'Excluir modelo', danger: true }); if (!confirmed) return; const templates = state.templates.filter(item => item.id !== template.id); if (persistir({ ...state, templates })) { renderModelos(); atualizarOpcoesModelos(); atualizarVisaoSeguranca(); toast('Modelo excluído.'); } }, 'danger')
+      );
+      card.append(heading, description, actions); box.appendChild(card);
+    });
+  }
   function nomePrincipalDocumento(r) { const f = r.fields || {}; if (r.dynamic) return r.dynamicLabel || r.templateSnapshot && r.templateSnapshot.definition.name || 'Documento'; if (r.type === 'receipt') return r.tenant || ''; if (r.type === 'declaration') return f.docDeclarant || ''; if (r.type === 'term') return f.docPartyOne || ''; if (r.type === 'contract') { const sub = f.docContractSubtype; return sub === 'sale' ? (f.docBuyer || f.docSeller || '') : (f.docTenantParty || f.docLandlord || ''); } return ''; }
   function imovelDocumento(r) { const f = r.fields || {}; if (r.dynamic) return ''; return r.type === 'receipt' ? r.property || '' : r.type === 'term' ? f.docProperty || '' : r.type === 'contract' ? f.docContractProperty || '' : f.docSubject || ''; }
   function valorDocumento(r) { if (r.dynamic) { const field = r.templateSnapshot && r.templateSnapshot.definition.fields.find(x => x.type === 'currency'); return field ? (parseValor(r.fields && r.fields[field.id]) || 0) : 0; } if (r.type === 'receipt') return Number(r.amount) || 0; const v = String(r.fields && r.fields.docContractValue || ''); return Number.isFinite(parseValor(v)) ? parseValor(v) : 0; }
@@ -1066,8 +1093,8 @@
       badgeTipo.classList.add('type-' + r.type);
     });
   }
-  function carregar(r) {
-    if (!confirmarDescartarRascunho()) return false;
+  async function carregar(r) {
+    if (!await confirmarDescartarRascunho()) return false;
     const erros = validarDados(r);
     if (Object.keys(erros).length) { toast('Este registro contém dados inválidos e não pode ser carregado.', true); return false; }
     activeRecord = Object.freeze({ ...r, status: statusRegistro(r) });
@@ -1076,13 +1103,131 @@
     toast('Recibo ' + r.number + ' carregado para consulta ou reimpressão.');
     return true;
   }
-  function imprimirRegistro(r) { if (carregar(r)) setTimeout(imprimir, 0); }
-  function abrirModal(id) { lastModalTrigger = document.activeElement; $(id).hidden = false; document.body.style.overflow = 'hidden'; }
-  function fecharModal(id) {
-    $(id).hidden = true;
-    if ($('confirmModal').hidden && $('cancelModal').hidden) { document.body.style.overflow = ''; if (lastModalTrigger && document.contains(lastModalTrigger)) lastModalTrigger.focus(); lastModalTrigger = null; }
+  async function imprimirRegistro(r) { if (await carregar(r)) setTimeout(imprimir, 0); }
+  function modalSuperior() {
+    for (let index = modalStack.length - 1; index >= 0; index--) {
+      const modal = $(modalStack[index]);
+      if (modal && !modal.hidden) return modal;
+    }
+    return null;
   }
-  function manterFocoNoModal(evento) { if (evento.key !== 'Tab') return; const modal = !$('confirmModal').hidden ? $('confirmModal') : !$('cancelModal').hidden ? $('cancelModal') : null; if (!modal) return; const focaveis = [...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(el => el.offsetParent !== null); if (!focaveis.length) return; const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1]; if (evento.shiftKey && document.activeElement === primeiro) { evento.preventDefault(); ultimo.focus(); } else if (!evento.shiftKey && document.activeElement === ultimo) { evento.preventDefault(); primeiro.focus(); } }
+  function elementosFocaveis(modal) {
+    if (!modal) return [];
+    return [...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])')]
+      .filter(element => element.offsetParent !== null && element.getAttribute('aria-hidden') !== 'true');
+  }
+  function resolverFocoInicial(modal, initialFocus) {
+    const candidate = typeof initialFocus === 'function' ? initialFocus() : typeof initialFocus === 'string' ? modal.querySelector(initialFocus) : initialFocus;
+    return candidate && modal.contains(candidate) && !candidate.disabled ? candidate : elementosFocaveis(modal)[0] || modal.querySelector('[role="dialog"]');
+  }
+  function abrirModal(id, options = {}) {
+    const modal = $(id); if (!modal) return false;
+    const previous = modalState.get(id);
+    const trigger = previous?.trigger || pendingModalTrigger || (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    modalState.set(id, { closeOnEscape: true, closeOnBackdrop: true, ...previous, ...options, trigger });
+    const oldIndex = modalStack.indexOf(id); if (oldIndex >= 0) modalStack.splice(oldIndex, 1); modalStack.push(id);
+    modal.hidden = false; document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => resolverFocoInicial(modal, options.initialFocus)?.focus());
+    return true;
+  }
+  function destinoRetornoFoco(state) {
+    const explicit = typeof state?.returnFocus === 'function' ? state.returnFocus() : typeof state?.returnFocus === 'string' ? document.querySelector(state.returnFocus) : state?.returnFocus;
+    const original = explicit || state?.trigger;
+    if (original && document.contains(original) && !original.closest('[hidden]') && original.offsetParent !== null) return original;
+    const originalMenu = original?.closest?.('.history-menu');
+    if (originalMenu && document.contains(originalMenu) && !originalMenu.closest('[hidden]')) { originalMenu.open = true; return original; }
+    const id = state?.trigger?.id, label = state?.trigger?.getAttribute?.('aria-label'), triggerText = clean(state?.trigger?.textContent);
+    const candidates = [...document.querySelectorAll('button,[role="button"],a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(element => !element.closest('[hidden]') && element.offsetParent !== null);
+    return candidates.find(element => id && element.id === id) || candidates.find(element => label && element.getAttribute('aria-label') === label) || candidates.find(element => triggerText && clean(element.textContent) === triggerText) || document.querySelector('.app-tabs [role="tab"][aria-selected="true"]');
+  }
+  function fecharModal(id, { restoreFocus = true } = {}) {
+    const modal = $(id); if (!modal) return;
+    const state = modalState.get(id); modal.hidden = true;
+    const index = modalStack.lastIndexOf(id); if (index >= 0) modalStack.splice(index, 1); modalState.delete(id);
+    const next = modalSuperior();
+    if (!next) document.body.style.overflow = '';
+    if (restoreFocus) {
+      const restore = () => {
+      const candidate = destinoRetornoFoco(state);
+      if (candidate) candidate.focus();
+      else if (next && !next.contains(document.activeElement)) resolverFocoInicial(next, modalState.get(next.id)?.initialFocus)?.focus();
+      };
+      restore(); requestAnimationFrame(restore);
+    }
+    else if (next && !next.contains(document.activeElement)) requestAnimationFrame(() => resolverFocoInicial(next, modalState.get(next.id)?.initialFocus)?.focus());
+  }
+  function solicitarFechamentoModal(modal, reason) {
+    if (!modal) return false;
+    const state = modalState.get(modal.id) || {};
+    if ((reason === 'escape' && state.closeOnEscape === false) || (reason === 'backdrop' && state.closeOnBackdrop === false)) return false;
+    if (typeof state.onRequestClose === 'function') state.onRequestClose(reason);
+    else fecharModal(modal.id);
+    return true;
+  }
+  function manterFocoNoModal(evento) {
+    if (evento.key !== 'Tab') return;
+    const modal = modalSuperior(); if (!modal) return;
+    const focaveis = elementosFocaveis(modal); if (!focaveis.length) { evento.preventDefault(); modal.querySelector('[role="dialog"]')?.focus(); return; }
+    const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1];
+    if (!modal.contains(document.activeElement)) { evento.preventDefault(); (evento.shiftKey ? ultimo : primeiro).focus(); }
+    else if (evento.shiftKey && document.activeElement === primeiro) { evento.preventDefault(); ultimo.focus(); }
+    else if (!evento.shiftKey && document.activeElement === ultimo) { evento.preventDefault(); primeiro.focus(); }
+  }
+  function erroModalAcao(message = '') {
+    const error = $('actionModalError'); error.textContent = message; error.hidden = !message;
+  }
+  function renderizarCamposModalAcao(fields = []) {
+    const host = $('actionModalFields'); host.replaceChildren(); const controls = new Map();
+    fields.forEach((field, index) => {
+      const name = String(field.name || `field${index}`), inputId = `actionModalField-${name.replace(/[^a-z0-9_-]/gi, '-')}`, errorId = `${inputId}-error`;
+      const wrapper = document.createElement('div'); wrapper.className = 'field';
+      const label = document.createElement('label'); label.htmlFor = inputId; label.textContent = field.label || 'Valor';
+      const control = field.type === 'textarea' ? document.createElement('textarea') : field.type === 'select' ? document.createElement('select') : document.createElement('input');
+      control.id = inputId; control.name = name;
+      if (control instanceof HTMLInputElement) control.type = field.type || 'text';
+      if (field.options && control instanceof HTMLSelectElement) field.options.forEach(option => control.add(new Option(option.label, option.value)));
+      control.value = String(field.value ?? '');
+      ['min', 'max', 'maxLength', 'placeholder', 'autocomplete', 'inputMode'].forEach(property => { if (field[property] != null) control[property] = field[property]; });
+      control.setAttribute('aria-describedby', [field.help ? `${inputId}-help` : '', errorId].filter(Boolean).join(' '));
+      const error = document.createElement('div'); error.className = 'field-error'; error.id = errorId; error.setAttribute('role', 'alert');
+      control.addEventListener('input', () => { error.textContent = ''; control.setAttribute('aria-invalid', 'false'); erroModalAcao(); });
+      wrapper.append(label, control);
+      if (field.help) { const help = document.createElement('p'); help.className = 'field-help'; help.id = `${inputId}-help`; help.textContent = field.help; wrapper.append(help); }
+      wrapper.append(error); host.append(wrapper); controls.set(name, { control, error });
+    });
+    return controls;
+  }
+  function cancelarModalAcao() {
+    if (!activeActionDialog) return;
+    const dialog = activeActionDialog; activeActionDialog = null; fecharModal('actionModal'); dialog.resolve(null);
+  }
+  async function confirmarModalAcao() {
+    if (!activeActionDialog || activeActionDialog.submitting) return;
+    const dialog = activeActionDialog, values = {};
+    dialog.controls.forEach(({ control }, name) => { values[name] = control.value; });
+    dialog.controls.forEach(({ control, error }) => { control.setAttribute('aria-invalid', 'false'); error.textContent = ''; }); erroModalAcao();
+    const validation = typeof dialog.options.validate === 'function' ? await dialog.options.validate(values) : { ok: true };
+    if (validation === false || validation?.ok === false) {
+      const fieldErrors = validation?.fieldErrors || {};
+      Object.entries(fieldErrors).forEach(([name, message]) => { const item = dialog.controls.get(name); if (!item) return; item.control.setAttribute('aria-invalid', 'true'); item.error.textContent = message; });
+      const firstInvalid = [...dialog.controls.values()].find(item => item.control.getAttribute('aria-invalid') === 'true');
+      erroModalAcao(validation?.message || 'Confira os campos indicados.'); (firstInvalid?.control || $('actionModalError')).focus(); return;
+    }
+    activeActionDialog = null; fecharModal('actionModal'); dialog.resolve(values);
+  }
+  function solicitarAcao(options = {}) {
+    if (activeActionDialog) return Promise.resolve(null);
+    $('actionModalTitle').textContent = options.title || 'Confirmar ação';
+    $('actionModalDescription').textContent = options.description || 'Revise antes de continuar.';
+    $('actionModalCancel').textContent = options.cancelLabel || 'Voltar';
+    $('actionModalConfirm').textContent = options.confirmLabel || 'Confirmar';
+    $('actionModalConfirm').className = `btn ${options.danger ? 'btn-danger' : 'btn-primary'}`;
+    erroModalAcao(); const controls = renderizarCamposModalAcao(options.fields || []);
+    return new Promise(resolve => {
+      activeActionDialog = { options, controls, resolve, submitting: false };
+      abrirModal('actionModal', { initialFocus: options.initialFocus || (controls.size ? () => controls.values().next().value.control : '#actionModalConfirm'), onRequestClose: cancelarModalAcao });
+    });
+  }
   function valorRevisao(value) {
     if (Array.isArray(value)) return value.filter(Boolean).join('\n');
     const text = String(value ?? '').trim();
@@ -1126,8 +1271,7 @@
     $('confirmIssueBtn').textContent = options.confirmLabel || 'Emitir e registrar';
     renderizarCamposRevisao(options.fields);
     erroRevisao();
-    abrirModal('confirmModal');
-    $('confirmIssueBtn').focus();
+    abrirModal('confirmModal', { initialFocus: '#confirmIssueBtn', onRequestClose: cancelarRevisao });
     return new Promise(resolve => { activeIssueReview = { ...options, resolve }; });
   }
   async function confirmarRevisaoEmissao() {
@@ -1226,10 +1370,11 @@
   function abrirCancelamento(number) {
     const r = state.history.find(x => x.number === number);
     if (!r || statusRegistro(r) === 'canceled') return;
+    const returnTarget = pendingModalTrigger || document.activeElement;
     cancelTargetNumber = number; $('cancelReason').value = ''; $('cancelReasonError').textContent = '';
     $('cancelOperator').value = operadores.includes($('operator').value) ? $('operator').value : (state.meta.defaultOperator || operadores[0]);
     $('cancelReason').setAttribute('aria-invalid', 'false');
-    abrirModal('cancelModal'); $('cancelReason').focus();
+    abrirModal('cancelModal', { initialFocus: '#cancelReason', returnFocus: () => { const menu = returnTarget?.closest?.('.history-menu'); if (menu && document.contains(menu)) menu.open = true; return returnTarget; }, onRequestClose: fecharCancelamento });
   }
   function fecharCancelamento() {
     cancelTargetNumber = null; fecharModal('cancelModal');
@@ -1256,15 +1401,11 @@
     }
     renderHistorico(); atualizar(); toast('Recibo ' + number + ' cancelado e mantido no histórico.');
   }
-  function ajustarNumero() {
+  async function ajustarNumero() {
     if (activeRecord) return;
     const ano = anoSel(), atual = proxSeq(ano);
-    const resp = prompt('Informe o próximo número sequencial para ' + ano + ':', String(atual));
-    if (resp === null) return;
-    if (!/^\d+$/.test(resp.trim()) || Number(resp) < atual || Number(resp) > 9999999) {
-      toast('Informe um número inteiro de ' + atual + ' a 9.999.999.', true); return;
-    }
-    const n = Number(resp);
+    const result = await solicitarAcao({ title: `Ajustar sequência de ${ano}`, description: 'A sequência só pode avançar. Documentos já emitidos e seus números não serão alterados.', confirmLabel: 'Atualizar sequência', fields: [{ name: 'number', label: 'Próximo número sequencial', type: 'number', value: String(atual), min: atual, max: 9999999, inputMode: 'numeric' }], validate: values => /^\d+$/.test(clean(values.number)) && Number(values.number) >= atual && Number(values.number) <= 9999999 ? { ok: true } : { ok: false, fieldErrors: { number: `Informe um número inteiro de ${atual} a 9.999.999.` } } });
+    if (!result) return; const n = Number(result.number);
     if (persistir({ ...state, counters: { ...state.counters, [String(ano)]: n } })) {
       atualizar(); toast('Próximo recibo definido como ' + nro(ano, n) + '.');
     }
@@ -1299,11 +1440,8 @@
   async function exportarBackupProtegido() {
     if (storageCorrupted) { baixarDadosRecuperacao(); return; }
     if (!globalThis.crypto || !crypto.subtle) { toast('Este navegador não oferece criptografia para o backup.', true); return; }
-    const senha = prompt('Crie uma senha com pelo menos 8 caracteres para proteger o backup:');
-    if (senha === null) return;
-    if (senha.length < 8) { toast('A senha precisa ter pelo menos 8 caracteres.', true); return; }
-    const confirmacao = prompt('Repita a senha do backup protegido:');
-    if (confirmacao !== senha) { toast('As senhas não coincidem.', true); return; }
+    const credentials = await solicitarAcao({ title: 'Proteger backup com senha', description: 'Guarde esta senha em local seguro. Sem ela, o arquivo não poderá ser recuperado.', confirmLabel: 'Gerar backup protegido', fields: [{ name: 'password', label: 'Nova senha', type: 'password', autocomplete: 'new-password', help: 'Use pelo menos 8 caracteres.' }, { name: 'confirmation', label: 'Repita a senha', type: 'password', autocomplete: 'new-password' }], validate: values => { const fieldErrors = {}; if (values.password.length < 8) fieldErrors.password = 'Use pelo menos 8 caracteres.'; if (values.confirmation !== values.password) fieldErrors.confirmation = 'As senhas não coincidem.'; return Object.keys(fieldErrors).length ? { ok: false, fieldErrors } : { ok: true }; } });
+    if (!credentials) return; const senha = credentials.password;
     try {
       const next = estadoComBackupRegistrado(), salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
       const key = await chaveBackup(senha, salt, 'encrypt');
@@ -1321,8 +1459,8 @@
   async function abrirBackupProtegido(envelope) {
     if (!envelope || envelope.encrypted !== true) return envelope;
     if (!globalThis.crypto || !crypto.subtle) throw new Error('Este navegador não consegue abrir backups protegidos.');
-    const senha = prompt('Digite a senha deste backup protegido:');
-    if (senha === null) throw new Error('Importação cancelada.');
+    const credentials = await solicitarAcao({ title: 'Abrir backup protegido', description: 'Digite a senha usada quando este arquivo foi criado.', confirmLabel: 'Abrir backup', fields: [{ name: 'password', label: 'Senha do backup', type: 'password', autocomplete: 'current-password' }], validate: values => values.password ? { ok: true } : { ok: false, fieldErrors: { password: 'Informe a senha do backup.' } } });
+    if (!credentials) { const error = new Error('Importação cancelada.'); error.name = 'AbortError'; throw error; } const senha = credentials.password;
     try {
       const salt = base64ParaBytes(envelope.salt), iv = base64ParaBytes(envelope.iv), dados = base64ParaBytes(envelope.data);
       const key = await chaveBackup(senha, salt, 'decrypt');
@@ -1438,12 +1576,13 @@
         const documentCounters = { ...state.documentCounters }; for (const [chave, n] of Object.entries(incoming.documentCounters || {})) documentCounters[chave] = Math.max(Number(documentCounters[chave]) || 1, Number(n) || 1); documents.forEach(d => { const chave = chaveContadorDocumento(d.type, d.year), m = String(d.number).match(/-(\d+)\//); documentCounters[chave] = Math.max(Number(documentCounters[chave]) || 1, (m ? Number(m[1]) : 0) + 1); });
         const ignorados = incoming._importStats.ignoredContacts, clientesIgnorados = incoming._importStats.ignoredClients;
         const resumo = novos + ' recibo(s), ' + novosDocumentos + ' outro(s) documento(s), ' + atualizados + ' cancelamento(s) atualizado(s), ' + novosCadastros + ' cadastro(s) de imóvel e ' + novosClientes + ' cliente(s) novo(s)' + (ignorados || clientesIgnorados ? ' e ' + (ignorados + clientesIgnorados) + ' cadastro(s) inválido(s) ignorado(s)' : '');
-        if (!confirm('Importar ' + resumo + '? O histórico atual será preservado.')) return;
+        const confirmed = await solicitarAcao({ title: 'Importar este backup?', description: `${resumo}. O histórico atual será preservado e uma cópia de segurança será baixada antes da importação.`, confirmLabel: 'Importar backup' });
+        if (!confirmed) return;
         const seguranca = { ...state, meta: { ...state.meta, lastBackupAt: new Date().toISOString() } };
         baixarBackupEstado(seguranca, 'backup-antes-importacao');
         if (!persistir({ counters, documentCounters, history, documents, draftDocuments, templates, contacts, clients, draft: state.draft || incoming.draft, management: incoming.management && Object.keys(incoming.management).length ? incoming.management : state.management, meta: seguranca.meta })) return;
         historyPage = 1; renderCadastros(); renderGerenciadorClientes(); renderHistorico(); renderModelos(); atualizarClientesContrato(); atualizar(); if (currentDocumentType !== 'receipt') atualizarDocumentoGenerico(); toast('Backup importado: ' + resumo + '.');
-      } catch (e) { toast('Não foi possível importar. ' + (e.message || 'Arquivo inválido.'), true); }
+      } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível importar. ' + (e.message || 'Arquivo inválido.'), true); }
       finally { $('importFile').value = ''; }
     };
     reader.onerror = () => { toast('Não foi possível ler o arquivo.', true); $('importFile').value = ''; };
@@ -1479,10 +1618,10 @@
     }
     renderHistorico();
   }
-  function imprimir() {
+  async function imprimir() {
     if (!activeRecord) { toast('Emita e registre o recibo antes de imprimir.', true); return; }
     if (Object.keys(validarDados(activeRecord)).length) { toast('O registro não está válido para impressão.', true); return; }
-    if (!conteudoCabeEmUmaPagina() && !confirm('O recibo pode ultrapassar uma página A4. Deseja abrir a impressão mesmo assim?')) return;
+    if (!conteudoCabeEmUmaPagina()) { const confirmed = await solicitarAcao({ title: 'Imprimir prévia com mais de uma página?', description: 'O recibo pode ultrapassar uma página A4. Revise as quebras na janela de impressão antes de salvar o PDF.', confirmLabel: 'Abrir impressão' }); if (!confirmed) return; }
     const tituloAnterior = document.title, nome = nomeArquivoRecibo(activeRecord);
     document.title = nome; atualizar();
     let restaurado = false;
@@ -1541,6 +1680,8 @@
   ['docDeclarantDocument', 'docPartyOneDocument', 'docPartyTwoDocument', 'docLandlordDocument', 'docTenantPartyDocument', 'docSellerDocument', 'docBuyerDocument', 'docWitnessOneDocument', 'docWitnessTwoDocument'].forEach(id => $(id).addEventListener('input', e => { e.target.value = mascaraDocumento(e.target.value); genericDirty = true; atualizarDocumentoGenerico(); }));
   $('confirmIssueBtn').addEventListener('click', confirmarRevisaoEmissao);
   $('cancelIssueBtn').addEventListener('click', cancelarRevisao);
+  $('actionModalConfirm').addEventListener('click', confirmarModalAcao);
+  $('actionModalCancel').addEventListener('click', cancelarModalAcao);
   $('closeCancelBtn').addEventListener('click', fecharCancelamento);
   $('confirmCancelBtn').addEventListener('click', confirmarCancelamento);
   $('cancelReason').addEventListener('input', () => {
@@ -1589,6 +1730,9 @@
   function marcarMigracaoRecursos() { if (state.meta.resourceTemplateMigration >= 1) return; persistir({ ...state, meta: { ...state.meta, resourceTemplateMigration: 1 } }); }
   window.paraibaDocumentApp = {
     activateView: ativarView,
+    openModal: abrirModal,
+    closeModal: fecharModal,
+    requestAction: solicitarAcao,
     requestIssueReview: solicitarRevisaoEmissao,
     previewDynamicIdentity: identidadeDocumentoDinamico,
     saveDynamicDocument: salvarDocumentoDinamico,
@@ -1617,20 +1761,30 @@
   $('contactsSearch').addEventListener('input', renderGerenciadorCadastros); $('contactsStatus').addEventListener('change', renderGerenciadorCadastros); $('clearContactsFilters').addEventListener('click', () => { $('contactsSearch').value = ''; $('contactsStatus').value = 'all'; renderGerenciadorCadastros(); });
   $('clientForm').addEventListener('submit', salvarCliente); $('clientType').addEventListener('change', atualizarCamposCliente); $('clientDocument').addEventListener('input', event => { event.target.value = mascaraDocumento(event.target.value); $('clientFormError').textContent = ''; }); $('newClientBtn').addEventListener('click', limparCliente); $('newClientBtnInline').addEventListener('click', limparCliente); $('clientsSearch').addEventListener('input', renderGerenciadorClientes); $('clientsStatus').addEventListener('change', renderGerenciadorClientes); $('clearClientsFilters').addEventListener('click', () => { $('clientsSearch').value = ''; $('clientsStatus').value = 'all'; renderGerenciadorClientes(); });
   $('templatesSearch').addEventListener('input', renderModelos); $('templatesStatus').addEventListener('change', renderModelos); $('clearTemplatesFilters').addEventListener('click', () => { $('templatesSearch').value = ''; $('templatesStatus').value = 'all'; renderModelos(); }); $('newTemplateFromCurrentBtn').addEventListener('click', () => { if (currentDocumentType === 'receipt') { selecionarTipoDocumento('declaration', { ignorarConfirmacao: true }); } salvarModeloAtual(); });
-  $('newContactBtn').addEventListener('click', () => { selecionarTipoDocumento('receipt', { ignorarConfirmacao: true }); if (limpar()) { ativarView('new'); $('tenant').focus(); $('savedTenantStatus').textContent = 'Informe os dados e clique em “Salvar cadastro”.'; } }); $('previewMobileBtn').addEventListener('click', abrirPreview); $('previewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); }); $('genericPreviewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); });
+  $('newContactBtn').addEventListener('click', async () => { await selecionarTipoDocumento('receipt', { ignorarConfirmacao: true }); if (await limpar()) { ativarView('new'); $('tenant').focus(); $('savedTenantStatus').textContent = 'Informe os dados e clique em “Salvar cadastro”.'; } }); $('previewMobileBtn').addEventListener('click', abrirPreview); $('previewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); }); $('genericPreviewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); });
   $('appMenuToggle').addEventListener('click', () => definirMenuApp(!menuAppAberto()));
-  document.querySelectorAll('.app-tabs [role="tab"]').forEach(tab => { tab.addEventListener('click', () => ativarView(tab.dataset.view)); tab.addEventListener('keydown', e => { const tabs = [...document.querySelectorAll('.app-tabs [role="tab"]')], i = tabs.indexOf(tab); let destino = -1; if (e.key === 'ArrowRight') destino = (i + 1) % tabs.length; else if (e.key === 'ArrowLeft') destino = (i - 1 + tabs.length) % tabs.length; else if (e.key === 'Home') destino = 0; else if (e.key === 'End') destino = tabs.length - 1; if (destino >= 0) { e.preventDefault(); ativarView(tabs[destino].dataset.view, { focar: true }); } }); });
-  document.addEventListener('click', event => { if (event.target.closest('.app-tabs [role="tab"]')) fecharMenuApp(); });
-  $('confirmModal').addEventListener('click', e => {
-    if (e.target === $('confirmModal')) cancelarRevisao();
+  document.addEventListener('click', event => {
+    const tab = event.target.closest('.app-tabs [role="tab"]');
+    if (tab) { ativarView(tab.dataset.view); fecharMenuApp(); return; }
+    const backdrop = event.target.classList?.contains('modal-backdrop') ? event.target : null;
+    if (backdrop && modalSuperior() === backdrop) solicitarFechamentoModal(backdrop, 'backdrop');
   });
-  $('cancelModal').addEventListener('click', e => { if (e.target === $('cancelModal')) fecharCancelamento(); });
+  document.addEventListener('keydown', event => {
+    const tab = event.target.closest?.('.app-tabs [role="tab"]'); if (!tab) return;
+    const tabs = [...document.querySelectorAll('.app-tabs [role="tab"]')], index = tabs.indexOf(tab); let destination = -1;
+    if (event.key === 'ArrowRight') destination = (index + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft') destination = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === 'Home') destination = 0;
+    else if (event.key === 'End') destination = tabs.length - 1;
+    if (destination >= 0) { event.preventDefault(); ativarView(tabs[destination].dataset.view, { focar: true }); }
+  });
   document.addEventListener('keydown', e => {
     manterFocoNoModal(e);
     if (e.key !== 'Escape') return;
-    if (menuAppAberto()) { fecharMenuApp(); $('appMenuToggle').focus(); }
-    else if (!$('confirmModal').hidden) cancelarRevisao();
-    else if (!$('cancelModal').hidden) fecharCancelamento();
+    const modal = modalSuperior();
+    if (modal) { e.preventDefault(); solicitarFechamentoModal(modal, 'escape'); }
+    else if (menuAppAberto()) { fecharMenuApp(); $('appMenuToggle').focus(); }
+    else if (document.querySelector('.history-menu[open]')) { const menu = [...document.querySelectorAll('.history-menu[open]')].at(-1); menu.open = false; menu.querySelector('summary')?.focus(); }
     else if (document.body.classList.contains('preview-open')) { fecharPreview(); $('previewMobileBtn').focus(); }
   });
   document.addEventListener('click', e => { document.querySelectorAll('.history-menu[open]').forEach(menu => { if (!menu.contains(e.target)) menu.open = false; }); });

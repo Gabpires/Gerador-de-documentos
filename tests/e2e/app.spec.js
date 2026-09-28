@@ -551,3 +551,214 @@ test('cria template HTML, gera formulário dinâmico e congela snapshot na emiss
   const frozen = afterTemplateEdit.documents.find((record) => record.id === dynamic.id);
   expect(frozen.templateSnapshot.renderedHtml).toBe(originalSnapshot);
 });
+
+test('mantém o foco contido no modal, fecha com Escape e devolve o foco sem perder o rascunho', async ({ page }) => {
+  await preencherReciboValido(page);
+  const trigger = page.locator('#issueBtn');
+  await trigger.click();
+
+  await expect(page.locator('#confirmIssueBtn')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#cancelIssueBtn')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('#confirmIssueBtn')).toBeFocused();
+  expect(await page.evaluate(() => document.querySelector('#confirmModal').contains(document.activeElement))).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#confirmModal')).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(page.locator('#tenant')).toHaveValue('Maria da Silva');
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.history).toEqual([]);
+  expect(persisted.counters).toEqual({});
+});
+
+test('cancela o modal de cancelamento com Escape sem alterar o recibo', async ({ page }) => {
+  await preencherReciboValido(page);
+  await page.locator('#issueBtn').click();
+  await confirmarRevisao(page);
+  await selecionarAba(page, /Histórico/i);
+  const item = page.locator('.history-item').filter({ hasText: '01/2026' });
+  await item.locator('summary').click();
+  const trigger = item.getByRole('button', { name: 'Cancelar recibo' });
+  await trigger.click();
+
+  await expect(page.locator('#cancelReason')).toBeFocused();
+  await page.locator('#cancelOperator').focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('#confirmCancelBtn')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#cancelOperator')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#cancelModal')).toBeHidden();
+  await expect(trigger).toBeFocused();
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.history[0].status).toBe('issued');
+  expect(persisted.history[0].cancelReason || '').toBe('');
+});
+
+test('navega por todas as abas, inclusive Gestão e Dossiês, com setas, Home e End', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  const management = page.getByRole('tab', { name: /Gestão/i });
+  const create = page.getByRole('tab', { name: /Novo documento/i });
+  const dossiers = page.getByRole('tab', { name: /Dossiês/i });
+  const safety = page.getByRole('tab', { name: /Backup e segurança/i });
+
+  await management.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(create).toBeFocused();
+  await expect(page.locator('#view-new')).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(dossiers).toBeFocused();
+  await expect(page.locator('#view-dossiers')).toBeVisible();
+  await page.keyboard.press('End');
+  await expect(safety).toBeFocused();
+  await expect(page.locator('#view-safety')).toBeVisible();
+  await page.keyboard.press('Home');
+  await expect(management).toBeFocused();
+  await expect(page.locator('#view-management')).toBeVisible();
+});
+
+test('salva uma visão por modal próprio sem abrir diálogo nativo', async ({ page }) => {
+  const nativeDialogs = [];
+  page.on('dialog', dialog => nativeDialogs.push(dialog.type()));
+  await selecionarAba(page, /Gestão/i);
+  await page.locator('#advancedSearch').fill('contrato de teste');
+  const trigger = page.locator('#saveViewBtn');
+  await trigger.click();
+
+  await expect(page.getByRole('heading', { name: 'Salvar visão de pesquisa' })).toBeVisible();
+  await expect(page.getByLabel('Nome da visão')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#actionModal')).toBeHidden();
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await page.getByLabel('Nome da visão').fill('Contratos em revisão');
+  await page.locator('#actionModalConfirm').click();
+  await expect(page.locator('#savedViewSelect')).toContainText('Contratos em revisão');
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.management.savedViews).toHaveLength(1);
+  expect(nativeDialogs).toEqual([]);
+});
+
+test('mantém a justificativa obrigatória dentro do modal de situação e devolve o foco', async ({ page }) => {
+  const nativeDialogs = [];
+  page.on('dialog', dialog => nativeDialogs.push(dialog.type()));
+  await preencherReciboValido(page);
+  await page.locator('#issueBtn').click();
+  await confirmarRevisao(page);
+  await selecionarAba(page, /Dossiês/i);
+
+  const trigger = page.getByRole('button', { name: /Atualizar situação de Recibo 01\/2026/i });
+  await trigger.click();
+  await page.locator('#managementStatusSelect').selectOption('canceled');
+  await page.locator('#confirmManagementStatusBtn').click();
+  await expect(page.locator('#managementStatusModal')).toBeVisible();
+  await expect(page.locator('#managementStatusReasonError')).toContainText('pelo menos 3 caracteres');
+  await expect(page.locator('#managementStatusReason')).toHaveAttribute('aria-invalid', 'true');
+
+  await page.locator('#managementStatusReason').fill('Solicitação de teste');
+  await page.locator('#confirmManagementStatusBtn').click();
+  await expect(page.locator('#managementStatusModal')).toBeHidden();
+  await expect(trigger).toBeFocused();
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.history[0]).toMatchObject({ status: 'canceled', cancelReason: 'Solicitação de teste' });
+  expect(nativeDialogs).toEqual([]);
+});
+
+test('configura o bloqueio local em um único modal validado e cancelável', async ({ page }) => {
+  const nativeDialogs = [];
+  page.on('dialog', dialog => nativeDialogs.push(dialog.type()));
+  await selecionarAba(page, /Gestão/i);
+  const trigger = page.getByRole('button', { name: 'Configurar bloqueio local' });
+  await trigger.click();
+  await expect(page.getByRole('heading', { name: 'Configurar bloqueio local' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#actionModal')).toBeHidden();
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await page.getByLabel('Nova senha local').fill('senha-segura');
+  await page.getByLabel('Repita a senha').fill('senha-diferente');
+  await page.getByLabel('Minutos sem atividade').fill('15');
+  await page.locator('#actionModalConfirm').click();
+  await expect(page.getByText('As senhas não coincidem.')).toBeVisible();
+  await page.getByLabel('Repita a senha').fill('senha-segura');
+  await page.locator('#actionModalConfirm').click();
+  await expect(page.locator('#toast')).toContainText('Bloqueio local configurado');
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.management.settings.localLock).toMatchObject({ enabled: true, timeoutMinutes: 15 });
+
+  await page.evaluate((key) => { const saved = JSON.parse(localStorage.getItem(key)); saved.management.settings.localLock.timeoutMinutes = 0.001; localStorage.setItem(key, JSON.stringify(saved)); }, storageKey);
+  await page.reload();
+  await expect(page.locator('#managementLockModal')).toBeVisible();
+  await expect(page.locator('#managementUnlockPassword')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#managementLockModal')).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#unlockManagementBtn')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#managementUnlockPassword')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('#unlockManagementBtn')).toBeFocused();
+  await page.locator('#managementUnlockPassword').fill('senha-segura');
+  await page.evaluate((key) => { const saved = JSON.parse(localStorage.getItem(key)); saved.management.settings.localLock.timeoutMinutes = 120; localStorage.setItem(key, JSON.stringify(saved)); }, storageKey);
+  await page.locator('#unlockManagementBtn').click();
+  await expect(page.locator('#managementLockModal')).toBeHidden();
+  expect(nativeDialogs).toEqual([]);
+});
+
+test('expõe nomes acessíveis na formatação e na reordenação de campos', async ({ page }) => {
+  await selecionarAba(page, /Modelos/i);
+  await expect(page.getByRole('button', { name: 'Negrito' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Itálico' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sublinhado' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mover campo 1 para cima' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mover campo 1 para baixo' })).toBeVisible();
+});
+
+test('cancela e arquiva documentos sem diálogos nativos', async ({ page }) => {
+  const nativeDialogs = [];
+  page.on('dialog', dialog => nativeDialogs.push(dialog.type()));
+  await selecionarAba(page, /Novo documento/i);
+  await page.getByRole('button', { name: 'Declaração', exact: true }).click();
+  await page.locator('#docTitle').fill('DECLARAÇÃO DE TESTE');
+  await page.locator('#docDate').fill('2026-09-25');
+  await page.locator('#docCity').fill('Araçariguama/SP');
+  await page.locator('#docDeclarant').fill('Pessoa de Teste');
+  await page.locator('#docDeclarantDocument').fill('52998224725');
+  await page.locator('#docSubject').fill('Fluxo seguro');
+  await page.locator('#docBody').fill('Texto demonstrativo suficiente para emitir e testar ações posteriores.');
+  await page.locator('#genericIssueBtn').click();
+  await confirmarRevisao(page);
+  await page.evaluate((key) => {
+    const saved = JSON.parse(localStorage.getItem(key));
+    const original = saved.documents[0];
+    saved.documents.push({ ...original, id: `${original.id}-arquivo`, number: 'DECL-002/2026', createdAt: new Date(Date.now() + 1000).toISOString() });
+    saved.documentCounters['declaration|2026'] = 3;
+    localStorage.setItem(key, JSON.stringify(saved));
+  }, storageKey);
+  await page.reload();
+  await selecionarAba(page, /Histórico/i);
+
+  const cancelItem = page.locator('.history-item').filter({ hasText: 'DECL-001/2026' });
+  await cancelItem.locator('summary').click();
+  await cancelItem.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Cancelar DECL-001/2026?' })).toBeVisible();
+  await page.locator('#actionModal').getByLabel('Motivo do cancelamento').fill('Solicitação de teste');
+  await page.locator('#actionModalConfirm').click();
+  await expect(cancelItem).toContainText('Cancelado');
+
+  const archiveItem = page.locator('.history-item').filter({ hasText: 'DECL-002/2026' });
+  await archiveItem.locator('summary').click();
+  await archiveItem.getByRole('button', { name: 'Arquivar', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Arquivar DECL-002/2026?' })).toBeVisible();
+  await page.locator('#actionModalConfirm').click();
+  await expect(archiveItem).toContainText('Arquivado');
+
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.documents.find(record => record.number === 'DECL-001/2026').status).toBe('canceled');
+  expect(persisted.documents.find(record => record.number === 'DECL-002/2026').status).toBe('archived');
+  expect(nativeDialogs).toEqual([]);
+});

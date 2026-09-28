@@ -2137,6 +2137,34 @@
         </div>
       </div>
     </div>
+    <div class="modal-backdrop" id="actionModal" hidden>
+      <div
+        class="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="actionModalTitle"
+        aria-describedby="actionModalDescription"
+        tabindex="-1"
+      >
+        <h2 id="actionModalTitle">Confirmar ação</h2>
+        <p id="actionModalDescription"></p>
+        <div class="action-modal-fields" id="actionModalFields"></div>
+        <p
+          class="modal-error"
+          id="actionModalError"
+          role="alert"
+          tabindex="-1"
+          hidden
+        ></p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" type="button" id="actionModalCancel">
+            Voltar</button
+          ><button class="btn btn-primary" type="button" id="actionModalConfirm">
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
     <div class="modal-backdrop" id="cancelModal" hidden>
       <div
         class="modal-card"
