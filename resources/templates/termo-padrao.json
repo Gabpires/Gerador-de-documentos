@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "termo-padrao",
+  "name": "Termo",
+  "documentKind": "term",
+  "status": "active",
+  "revision": 1,
+  "createdAt": "2026-09-25T00:00:00.000Z",
+  "updatedAt": "2026-09-25T00:00:00.000Z",
+  "fields": [
+    { "id": "titulo", "name": "Título", "tag": "{{TITULO}}", "type": "text", "required": true, "defaultValue": "TERMO", "helpText": "", "validation": "none", "options": [] },
+    { "id": "parte_um", "name": "Primeira parte", "tag": "{{PARTE_UM}}", "type": "text", "required": true, "defaultValue": "", "helpText": "", "validation": "none", "options": [] },
+    { "id": "parte_dois", "name": "Segunda parte", "tag": "{{PARTE_DOIS}}", "type": "text", "required": false, "defaultValue": "", "helpText": "", "validation": "none", "options": [] },
+    { "id": "condicoes", "name": "Condições", "tag": "{{CONDICOES}}", "type": "textarea", "required": true, "defaultValue": "", "helpText": "", "validation": "none", "options": [] }
+  ]
+}

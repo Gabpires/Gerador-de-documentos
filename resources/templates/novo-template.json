@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "novo-template",
+  "name": "Novo template",
+  "documentKind": "contract",
+  "status": "active",
+  "revision": 1,
+  "createdAt": "2026-09-28T13:02:39.291Z",
+  "updatedAt": "2026-09-28T13:02:39.293Z",
+  "fields": [
+    {
+      "id": "nome_locatario",
+      "name": "Nome Locatario",
+      "tag": "{{NOME_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "preencher nome",
+      "helpText": "Inserir nome completo do locatário",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "campo_2",
+      "name": "Campo 2",
+      "tag": "{{CAMPO_2}}",
+      "type": "text",
+      "required": false,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    }
+  ]
+}

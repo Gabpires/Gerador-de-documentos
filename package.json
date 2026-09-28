@@ -5,16 +5,18 @@
   "description": "Gerador local de documentos da Paraíba Imóveis.",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "start": "npm run dev",
+    "dev": "node server.mjs --dev",
+    "start": "node server.mjs",
+    "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "playwright test",
+    "test:api": "node --test tests/server/templates.test.mjs",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:visual": "playwright test --project=chromium --project=mobile-chrome",
     "test:report": "playwright show-report",
-    "check": "npm run test"
+    "check": "npm run test:api && npm run test"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

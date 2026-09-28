@@ -138,7 +138,7 @@ test('cadastra clientes PF e PJ e aplica a qualificação completa no contrato',
   await expect(page.locator('#clientsList')).toContainText('Controle Exemplo Sistemas Ltda.');
 
   saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
-  expect(saved.meta.schemaVersion).toBe(10);
+  expect(saved.meta.schemaVersion).toBe(11);
   expect(saved.clients).toHaveLength(2);
   const companyId = saved.clients.find(client => client.kind === 'company').id;
 
@@ -249,11 +249,12 @@ test('migra o estado anterior sem apagar cadastros ou criar cliente indevido', a
   await page.reload();
 
   const migrated = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
-  expect(migrated.meta.schemaVersion).toBe(10);
+  expect(migrated.meta.schemaVersion).toBe(11);
   expect(migrated.contacts).toHaveLength(1);
   expect(migrated.clients).toEqual([]);
   await expect(page.locator('#savedTenant')).toContainText('Pessoa de Migração');
-  const backup = await page.evaluate((key) => localStorage.getItem(`${key}_antes_schema_10`), storageKey);
+  expect(migrated.meta.templateEngineMigration).toBe(1);
+  const backup = await page.evaluate((key) => localStorage.getItem(`${key}_antes_schema_11`), storageKey);
   expect(backup).toContain('Pessoa de Migração');
 });
 
@@ -346,4 +347,38 @@ test('valida, emite em lote e registra a situação no dossiê', async ({ page }
   await page.locator('#confirmManagementStatusBtn').click();
   const updated = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
   expect(updated.history[0].status).toBe('sent');
+});
+
+test('cria template HTML, gera formulário dinâmico e congela snapshot na emissão', async ({ page, isMobile }) => {
+  await selecionarAba(page, /Modelos/i);
+  await expect(page.locator('#templateStudio')).toBeVisible();
+
+  await page.locator('#newTemplateBtn').click();
+  const suffix = `${isMobile ? 'mobile' : 'desktop'}-${Date.now()}`;
+  const templateId = `teste-dinamico-${suffix}`;
+  await page.locator('#templateId').fill(templateId);
+  await page.locator('#templateName').fill('Comprovante dinâmico de teste');
+  await page.locator('#templateKind').selectOption('custom');
+  const field = page.locator('#templateFields .template-field-row').first();
+  await field.getByLabel('Identificador').fill('pagamento');
+  await field.getByLabel('Nome do campo').fill('Forma de pagamento');
+  await field.getByLabel('Tipo').selectOption('select');
+  await field.getByLabel('Opções do combobox').fill('Pix=pix\nBoleto=boleto');
+  await page.locator('#templateSourceToggle').click();
+  await page.locator('#templateHtmlSource').fill('<!doctype html><html><body><h1>Comprovante</h1><p>Pagamento: {{FORMA_DE_PAGAMENTO}}</p></body></html>');
+  await page.locator('#saveTemplateBtn').click();
+  await expect(page.locator('#templateEngineNotice')).toContainText('salvo em resources/templates');
+
+  const card = page.locator(`.template-resource-card[data-template-id="${templateId}"]`);
+  await card.getByRole('button', { name: 'Usar documento' }).click();
+  await expect(page.locator('#dynamicDocumentHost')).toBeVisible();
+  await page.locator('#dynamic-pagamento').selectOption('pix');
+  await page.getByRole('button', { name: 'Emitir documento' }).click();
+  await expect(page.locator('#templateEngineNotice')).toContainText('emitido e congelado');
+
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  const dynamic = persisted.documents.find((record) => record.dynamic === true);
+  expect(dynamic.number).toBe('');
+  expect(dynamic.templateSnapshot.definition.fields[0].tag).toBe('{{FORMA_DE_PAGAMENTO}}');
+  expect(dynamic.templateSnapshot.renderedHtml).toContain('Pix');
 });

@@ -1,6 +1,6 @@
 # Gerador de Documentos — Paraíba Imóveis
 
-Aplicação local para criar recibos, declarações, termos e contratos. Os dados ficam somente no armazenamento do navegador; use o fluxo de backup da própria aplicação antes de operar com dados reais.
+Aplicação local para criar recibos, declarações, termos, contratos e documentos livres. Os registros ficam no armazenamento do navegador; os templates HTML ficam no projeto e são atendidos por um servidor local, sem sincronização externa.
 
 ## Primeiro uso
 
@@ -14,10 +14,26 @@ npm run dev
 
 Abra o endereço indicado pelo Vite (normalmente `http://127.0.0.1:5173`). Para encerrar o servidor, use `Ctrl+C` no terminal.
 
+## Templates dinâmicos
+
+O menu **Modelos** inclui o construtor de formulários e o editor visual/HTML. Cada template salvo forma um par de arquivos em `resources/templates/`:
+
+```text
+resources/templates/
+  contrato-locacao.json  # campos, tags, categoria e revisão
+  contrato-locacao.html  # documento HTML com tags como {{LOCATARIO}}
+  _archived/             # pares arquivados, que podem ser restaurados
+```
+
+O JSON aceita campos `text`, `textarea`, `number`, `currency`, `date`, `select` e `checkbox`; campos `select` declaram as opções. Uma tag deve ser única e seguir o formato `{{NOME_DA_TAG}}`.
+
+O servidor escuta apenas em `127.0.0.1` e rejeita scripts, eventos HTML, iframes, SVG ativo e recursos externos. A prévia é isolada. Toda emissão dinâmica guarda uma cópia do HTML, do JSON e dos valores utilizados no `localStorage`, portanto futuras edições do template não alteram o documento emitido.
+
 ## Testes durante o desenvolvimento
 
 ```powershell
 npm run check                 # suíte completa em desktop e celular
+npm run test:api              # validações do servidor de templates
 npm run test:headed           # acompanha o navegador
 npm run test:debug            # pausa para depurar um cenário
 npm run test:ui               # abre a interface do Playwright

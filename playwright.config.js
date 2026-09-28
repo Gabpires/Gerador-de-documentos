@@ -20,6 +20,7 @@ export default defineConfig({
     command: 'npm run dev -- --port 4173',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
+    env: { ...process.env, RESOURCES_DIR: 'test-results/resources' },
     timeout: 30_000
   },
   projects: [
