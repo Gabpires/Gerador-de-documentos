@@ -42,6 +42,15 @@
   let activeGenericRecord = null;
   let editingGenericDraftId = '';
   let genericDirty = false;
+  const DOCUMENT_PAGINATION_DEBOUNCE_MS = 50;
+  let documentPaginationRequestedVersion = 0;
+  let documentPaginationCommittedVersion = 0;
+  let documentPaginationFrame = 0;
+  let documentPaginationTimer = 0;
+  let documentPaginationDeferred = false;
+  let documentPaginationMeasure = null;
+  let documentPaginationMeasurePages = null;
+  let previewScaleCache = { kind: '', available: -1, pageCount: -1, actionBarHeight: -1 };
 
   function statusRegistro(r) { return r && DOCUMENT_STATUSES.includes(r.status) ? r.status : 'issued'; }
   function clean(value) { return String(value ?? '').trim(); }
@@ -515,17 +524,31 @@
     atualizarVisaoSeguranca();
     ajustarAlturaMobile();
   }
-  function ajustarAlturaMobile() {
+  function ajustarAlturaMobile(options = {}) {
     const workspace = document.querySelector('.workspace'); if (!workspace) return;
-    const mobile = window.matchMedia('(max-width:767px)').matches, available = mobile ? Math.max(280, window.innerWidth - 20) : Math.max(280, workspace.clientWidth - 36);
+    const force = options && options.force === true;
+    const mobile = window.matchMedia('(max-width:767px)').matches;
+    const available = mobile ? Math.max(280, window.innerWidth - 20) : Math.max(280, workspace.clientWidth - 36);
     const actionBar = [...document.querySelectorAll('.actions')].find(element => element.getClientRects().length);
     const actionBarHeight = mobile && actionBar ? Math.ceil(actionBar.getBoundingClientRect().height) : 0;
-    document.documentElement.style.setProperty('--mobile-action-bar-height', actionBarHeight + 'px');
-    if (currentDocumentType === 'receipt') {
-      const shell = document.querySelector('.page-shell'), receipt = $('receipt'); if (!shell || !receipt) return; const baseWidth = receipt.offsetWidth || 794, baseHeight = receipt.offsetHeight || 1123, scale = Math.min(1, available / baseWidth); receipt.style.setProperty('--preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
-    } else {
-      const shell = $('documentPageShell'), pages = $('documentPagesPreview'); if (!shell || !pages) return; const firstPage = pages.querySelector('[data-document-preview-page]'), baseWidth = firstPage?.offsetWidth || 794, baseHeight = Math.max(pages.scrollHeight || 1123, 1123), scale = Math.min(1, available / baseWidth); pages.style.setProperty('--document-preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
+    if (force || previewScaleCache.actionBarHeight !== actionBarHeight) {
+      document.documentElement.style.setProperty('--mobile-action-bar-height', actionBarHeight + 'px');
     }
+
+    const kind = currentDocumentType === 'receipt' ? 'receipt' : 'generic';
+    const pageCount = kind === 'generic' ? $('documentPagesPreview')?.childElementCount || 0 : 1;
+    if (!force && previewScaleCache.kind === kind && previewScaleCache.available === available && previewScaleCache.pageCount === pageCount && previewScaleCache.actionBarHeight === actionBarHeight) return;
+
+    if (kind === 'receipt') {
+      const shell = document.querySelector('.page-shell'), receipt = $('receipt'); if (!shell || !receipt) return;
+      const baseWidth = receipt.offsetWidth || 794, baseHeight = receipt.offsetHeight || 1123, scale = Math.min(1, available / baseWidth);
+      receipt.style.setProperty('--preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
+    } else {
+      const shell = $('documentPageShell'), pages = $('documentPagesPreview'); if (!shell || !pages) return;
+      const firstPage = pages.querySelector('[data-document-preview-page]'), baseWidth = firstPage?.offsetWidth || 794, baseHeight = Math.max(pages.scrollHeight || 1123, 1123), scale = Math.min(1, available / baseWidth);
+      pages.style.setProperty('--document-preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
+    }
+    previewScaleCache = { kind, available, pageCount, actionBarHeight };
   }
   function atualizarVisaoSeguranca() { const backup = estadoBackup(); $('safetyReceiptsCount').textContent = String(state.history.length); $('safetyDocumentsCount').textContent = String(state.documents.length); $('safetyDraftsCount').textContent = String(state.draftDocuments.length + (state.draft ? 1 : 0)); $('safetyTemplatesCount').textContent = String(state.templates.length); $('safetyContactsCount').textContent = String(state.contacts.length); $('safetyClientsCount').textContent = String(state.clients.length); $('safetySchemaVersion').textContent = String(SCHEMA_VERSION); $('safetyLastBackup').textContent = backup.kind === 'missing' ? 'Não registrado' : backup.kind === 'recovery' ? 'Recuperação necessária' : dataHora(backup.lastBackupAt); }
   function conteudoCabeEmUmaPagina() {
@@ -564,7 +587,12 @@
     document.querySelectorAll('.view-panel').forEach(item => { const ativo = item === panel; item.hidden = !ativo; item.classList.toggle('is-active', ativo); }); fecharMenuApp(); fecharPreview();
     if (nome === 'history') renderHistorico(); if (nome === 'contacts') renderGerenciadorCadastros(); if (nome === 'clients') renderGerenciadorClientes(); if (nome === 'templates') renderModelos(); if (nome === 'safety') { atualizarBackupStatus(); atualizarVisaoSeguranca(); } if (nome === 'new') setTimeout(ajustarAlturaMobile, 0); if (focar) { if (window.matchMedia('(max-width: 767px)').matches) definirMenuApp(true); abrirGrupoDaAba(tab, { focar: true }); } document.dispatchEvent(new CustomEvent('app:viewchange', { detail: { view: nome } })); window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
-  function abrirPreview() { document.body.classList.add('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'true'); setTimeout(() => { ajustarAlturaMobile(); $(currentDocumentType === 'receipt' ? 'previewCloseBtn' : 'genericPreviewCloseBtn').focus(); }, 0); }
+  function abrirPreview() {
+    document.body.classList.add('preview-open');
+    $('previewMobileBtn').setAttribute('aria-expanded', 'true');
+    if (currentDocumentType !== 'receipt') finalizarPaginacaoDocumento();
+    setTimeout(() => { ajustarAlturaMobile({ force: true }); $(currentDocumentType === 'receipt' ? 'previewCloseBtn' : 'genericPreviewCloseBtn').focus(); }, 0);
+  }
   function fecharPreview() { const aberta = document.body.classList.contains('preview-open'); document.body.classList.remove('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'false'); if (aberta) setTimeout(ajustarAlturaMobile, 0); }
   function focoEmEntradaDeDados(elemento) {
     return elemento instanceof Element && Boolean(elemento.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'));
@@ -822,7 +850,39 @@
   function atualizarOpcoesModelos() { const sel = $('docTemplate'), atual = sel.value; sel.replaceChildren(); const padrao = document.createElement('option'); padrao.value = ''; padrao.textContent = 'Modelo padrão'; sel.appendChild(padrao); state.templates.filter(t => t.active !== false && t.type === currentDocumentType).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).forEach(t => { const op = document.createElement('option'); op.value = t.id; op.textContent = t.name; sel.appendChild(op); }); sel.value = state.templates.some(t => t.id === atual && t.active !== false && t.type === currentDocumentType) ? atual : ''; }
   function aplicarModeloSelecionado() { const t = state.templates.find(x => x.id === $('docTemplate').value && x.active !== false); if (!t) return; preencherCamposGenericos({ ...t.fields, docDate: hoje(), docOperator: state.meta.defaultOperator || operadores[0] }); genericDirty = true; atualizarDocumentoGenerico(); toast('Modelo “' + t.name + '” aplicado.'); }
   async function limparDocumentoGenerico({ preservarTipo = true, ignorarConfirmacao = false } = {}) { if (!ignorarConfirmacao && genericDirty && !activeGenericRecord) { const confirmed = await solicitarAcao({ title: 'Descartar alterações do documento?', description: 'Os dados ainda não salvos serão removidos. Documentos já registrados permanecem inalterados.', confirmLabel: 'Descartar alterações', danger: true }); if (!confirmed) return false; } activeGenericRecord = null; editingGenericDraftId = ''; genericDirty = false; camposGenericosElementos().forEach(el => { if (el.type === 'checkbox') el.checked = false; else el.value = ''; }); document.querySelectorAll('[data-clause]').forEach(el => el.checked = false); $('docDate').value = hoje(); $('docCity').value = 'Araçariguama/SP'; $('docOperator').value = state.meta.defaultOperator || operadores[0]; $('docLetterhead').value = 'none'; $('docFooterEnabled').checked = false; $('docTermSubtype').value = 'general'; $('docContractSubtype').value = 'lease'; $('docTitle').value = tituloPadraoDocumento(currentDocumentType); $('docQuickContact').value = ''; $('docTemplate').value = ''; limparErrosGenericos(); travarDocumentoGenerico(false); atualizarCamposCondicionais(); atualizarDocumentoGenerico(); return true; }
-  async function selecionarTipoDocumento(tipo, { ignorarConfirmacao = false } = {}) { if (!DOCUMENT_TYPES[tipo]) return false; const hasPendingChanges = tipo !== currentDocumentType && ((currentDocumentType === 'receipt' && draftDirty && !activeRecord) || (currentDocumentType !== 'receipt' && genericDirty && !activeGenericRecord)); if (!ignorarConfirmacao && hasPendingChanges) { const confirmed = await solicitarAcao({ title: 'Trocar o tipo de documento?', description: 'As alterações ainda não salvas no documento atual serão descartadas.', confirmLabel: 'Trocar e descartar', danger: true }); if (!confirmed) return false; } currentDocumentType = tipo; document.querySelectorAll('[data-document-type]').forEach(b => b.setAttribute('aria-pressed', b.dataset.documentType === tipo ? 'true' : 'false')); $('receiptEditor').hidden = tipo !== 'receipt'; $('genericEditor').hidden = tipo === 'receipt'; $('receiptPreviewArea').hidden = tipo !== 'receipt'; $('genericPreviewArea').hidden = tipo === 'receipt'; $('editorTitle').textContent = tipo === 'receipt' ? 'Novo recibo' : 'Novo ' + rotuloTipo(tipo).toLowerCase(); $('editorSubtitle').textContent = tipo === 'receipt' ? 'Preencha, revise a prévia e confirme a emissão.' : 'Preencha os campos específicos, escolha o timbre e confira a prévia.'; if (tipo !== 'receipt') { if (!activeGenericRecord || activeGenericRecord.type !== tipo) { activeGenericRecord = null; editingGenericDraftId = ''; genericDirty = false; limparDocumentoGenerico({ preservarTipo: true, ignorarConfirmacao: true }); } atualizarCamposCondicionais(); atualizarCadastrosDocumento(); atualizarDocumentoGenerico(); } else { atualizar(); } ajustarAlturaMobile(); return true; }
+  async function selecionarTipoDocumento(tipo, { ignorarConfirmacao = false } = {}) {
+    if (!DOCUMENT_TYPES[tipo]) return false;
+    const hasPendingChanges = tipo !== currentDocumentType && ((currentDocumentType === 'receipt' && draftDirty && !activeRecord) || (currentDocumentType !== 'receipt' && genericDirty && !activeGenericRecord));
+    if (!ignorarConfirmacao && hasPendingChanges) {
+      const confirmed = await solicitarAcao({ title: 'Trocar o tipo de documento?', description: 'As alterações ainda não salvas no documento atual serão descartadas.', confirmLabel: 'Trocar e descartar', danger: true });
+      if (!confirmed) return false;
+    }
+    currentDocumentType = tipo;
+    document.querySelectorAll('[data-document-type]').forEach(b => b.setAttribute('aria-pressed', b.dataset.documentType === tipo ? 'true' : 'false'));
+    $('receiptEditor').hidden = tipo !== 'receipt';
+    $('genericEditor').hidden = tipo === 'receipt';
+    $('receiptPreviewArea').hidden = tipo !== 'receipt';
+    $('genericPreviewArea').hidden = tipo === 'receipt';
+    $('editorTitle').textContent = tipo === 'receipt' ? 'Novo recibo' : 'Novo ' + rotuloTipo(tipo).toLowerCase();
+    $('editorSubtitle').textContent = tipo === 'receipt' ? 'Preencha, revise a prévia e confirme a emissão.' : 'Preencha os campos específicos, escolha o timbre e confira a prévia.';
+    if (tipo !== 'receipt') {
+      if (!activeGenericRecord || activeGenericRecord.type !== tipo) {
+        activeGenericRecord = null;
+        editingGenericDraftId = '';
+        genericDirty = false;
+        limparDocumentoGenerico({ preservarTipo: true, ignorarConfirmacao: true });
+      }
+      atualizarCamposCondicionais();
+      atualizarCadastrosDocumento();
+      atualizarDocumentoGenerico();
+    } else {
+      cancelarAgendamentoPaginacaoDocumento();
+      definirPaginacaoDocumentoOcupada(false);
+      atualizar();
+    }
+    ajustarAlturaMobile();
+    return true;
+  }
   function adicionarTexto(container, texto, classe = '') { if (!String(texto || '').trim()) return; const p = document.createElement('p'); if (classe) p.className = classe; p.textContent = String(texto).trim(); container.appendChild(p); }
   function adicionarBloco(container, linhas) { const bloco = document.createElement('div'); bloco.className = 'data-block'; linhas.filter(x => x && String(x).trim()).forEach(x => adicionarTexto(bloco, x)); if (bloco.children.length) container.appendChild(bloco); }
   function adicionarTituloSecao(container, texto) { const h = document.createElement('h2'); h.textContent = texto; container.appendChild(h); }
@@ -835,16 +895,107 @@
     clone.querySelectorAll('[id]').forEach(item => item.removeAttribute('id'));
     return clone;
   }
-  function paginarDocumentoPreview() {
+  function previewGenericoMobileFechado() {
+    return window.matchMedia('(max-width:767px)').matches && !document.body.classList.contains('preview-open');
+  }
+  function definirPaginacaoDocumentoOcupada(ocupada) {
+    const preview = $('documentPagesPreview');
+    if (preview) preview.setAttribute('aria-busy', ocupada ? 'true' : 'false');
+  }
+  function cancelarAgendamentoPaginacaoDocumento() {
+    if (documentPaginationTimer) clearTimeout(documentPaginationTimer);
+    if (documentPaginationFrame) cancelAnimationFrame(documentPaginationFrame);
+    documentPaginationTimer = 0;
+    documentPaginationFrame = 0;
+  }
+  function obterHostMedicaoPaginacao() {
+    if (!documentPaginationMeasure) {
+      documentPaginationMeasure = document.createElement('div');
+      documentPaginationMeasure.className = 'document-pagination-measure';
+      documentPaginationMeasurePages = document.createElement('div');
+      documentPaginationMeasurePages.className = 'document-pages-preview';
+      documentPaginationMeasure.appendChild(documentPaginationMeasurePages);
+    }
+    if (!documentPaginationMeasure.isConnected) document.body.appendChild(documentPaginationMeasure);
+    documentPaginationMeasurePages.replaceChildren();
+    return documentPaginationMeasurePages;
+  }
+  function enfileirarQuadroPaginacaoDocumento() {
+    if (documentPaginationFrame || currentDocumentType === 'receipt') return;
+    if (previewGenericoMobileFechado()) { documentPaginationDeferred = true; return; }
+    documentPaginationFrame = requestAnimationFrame(() => {
+      documentPaginationFrame = 0;
+      executarPaginacaoDocumentoAgendada();
+    });
+  }
+  function agendarPaginacaoDocumento({ debounce = false } = {}) {
+    if (currentDocumentType === 'receipt') return documentPaginationRequestedVersion;
+    documentPaginationRequestedVersion += 1;
+    documentPaginationDeferred = false;
+    definirPaginacaoDocumentoOcupada(true);
+    if (documentPaginationTimer) clearTimeout(documentPaginationTimer);
+    documentPaginationTimer = 0;
+    if (debounce && documentPaginationFrame) {
+      cancelAnimationFrame(documentPaginationFrame);
+      documentPaginationFrame = 0;
+    }
+    if (previewGenericoMobileFechado()) {
+      if (documentPaginationFrame) cancelAnimationFrame(documentPaginationFrame);
+      documentPaginationFrame = 0;
+      documentPaginationDeferred = true;
+      return documentPaginationRequestedVersion;
+    }
+    if (debounce) {
+      documentPaginationTimer = setTimeout(() => {
+        documentPaginationTimer = 0;
+        enfileirarQuadroPaginacaoDocumento();
+      }, DOCUMENT_PAGINATION_DEBOUNCE_MS);
+    } else enfileirarQuadroPaginacaoDocumento();
+    return documentPaginationRequestedVersion;
+  }
+  function atualizarResultadoPaginacaoDocumento(pageCount) {
+    const message = pageCount > 1
+      ? 'Documento multipágina: ' + pageCount + ' páginas A4. Campos extensos, cláusulas e assinaturas foram distribuídos automaticamente.'
+      : 'Conteúdo distribuído em uma página A4.';
+    if ($('genericPageWarning').textContent !== message) $('genericPageWarning').textContent = message;
+  }
+  function executarPaginacaoDocumentoAgendada() {
+    if (currentDocumentType === 'receipt') return null;
+    if (previewGenericoMobileFechado()) { documentPaginationDeferred = true; return null; }
+    const version = documentPaginationRequestedVersion;
+    const startedAt = performance.now();
+    const pageCount = paginarDocumentoPreview(version);
+    if (pageCount == null) {
+      if (documentPaginationRequestedVersion > version) enfileirarQuadroPaginacaoDocumento();
+      return null;
+    }
+    documentPaginationCommittedVersion = version;
+    documentPaginationDeferred = false;
+    atualizarResultadoPaginacaoDocumento(pageCount);
+    definirPaginacaoDocumentoOcupada(false);
+    ajustarAlturaMobile();
+    document.dispatchEvent(new CustomEvent('document-preview:paginated', {
+      detail: { version, pageCount, duration: performance.now() - startedAt }
+    }));
+    return pageCount;
+  }
+  function finalizarPaginacaoDocumento() {
+    if (currentDocumentType === 'receipt') return 1;
+    cancelarAgendamentoPaginacaoDocumento();
+    const preview = $('documentPagesPreview');
+    if (documentPaginationCommittedVersion === documentPaginationRequestedVersion && preview?.childElementCount) {
+      documentPaginationDeferred = false;
+      definirPaginacaoDocumentoOcupada(false);
+      return preview.childElementCount;
+    }
+    if (documentPaginationRequestedVersion === 0) documentPaginationRequestedVersion = 1;
+    return executarPaginacaoDocumentoAgendada();
+  }
+  function paginarDocumentoPreview(expectedVersion = documentPaginationRequestedVersion) {
     const source = $('documentPreview'), target = $('documentPagesPreview');
     if (!source || !target) return 1;
 
-    const measure = document.createElement('div');
-    measure.className = 'document-pagination-measure';
-    const pagesHost = document.createElement('div');
-    pagesHost.className = 'document-pages-preview';
-    measure.appendChild(pagesHost);
-    document.body.appendChild(measure);
+    const pagesHost = obterHostMedicaoPaginacao();
 
     let pageNumber = 0;
     const createPage = () => {
@@ -891,14 +1042,28 @@
     let current = createPage();
 
     const fittedCharacterCount = (element, text) => {
-      let low = 0, high = text.length;
-      while (low < high) {
-        const middle = Math.ceil((low + high) / 2);
-        element.textContent = text.slice(0, middle);
-        if (overflows(current)) high = middle - 1;
-        else low = middle;
+      const page = current.page;
+      const fullScrollHeight = page.scrollHeight;
+      const clientHeight = page.clientHeight;
+      element.textContent = '';
+      const emptyScrollHeight = page.scrollHeight;
+      const availableHeight = Math.max(0, clientHeight - emptyScrollHeight);
+      const requiredHeight = Math.max(1, fullScrollHeight - emptyScrollHeight);
+      const step = Math.max(24, Math.min(80, Math.ceil(text.length * 0.02)));
+      let fitted = Math.max(0, Math.min(text.length, Math.floor(text.length * Math.min(1, availableHeight / requiredHeight)) - step));
+      const fits = characterCount => {
+        element.textContent = text.slice(0, characterCount);
+        return !overflows(current);
+      };
+      while (fitted > 0 && !fits(fitted)) fitted = Math.max(0, fitted - step);
+      if (fitted === 0 && !fits(0)) return 0;
+      while (fitted < text.length) {
+        const next = Math.min(text.length, fitted + step);
+        if (!fits(next)) break;
+        fitted = next;
       }
-      return low;
+      element.textContent = text.slice(0, fitted);
+      return fitted;
     };
     const safeTextBreak = (text, fitted) => {
       if (fitted >= text.length) return text.length;
@@ -1008,16 +1173,19 @@
       page.setAttribute('aria-label', 'Página ' + (index + 1) + ' de ' + pages.length);
       page.querySelector('.document-page-number').textContent = 'Página ' + (index + 1) + ' de ' + pages.length;
     });
+    if (expectedVersion !== documentPaginationRequestedVersion) {
+      pagesHost.replaceChildren();
+      return null;
+    }
     target.replaceChildren(...pages);
-    measure.remove();
     return pages.length || 1;
   }
-  function atualizarDocumentoGenerico() {
+  function atualizarDocumentoGenerico({ debouncePagination = false } = {}) {
     if (currentDocumentType === 'receipt') return; const d = activeGenericRecord || dadosDocumentoGenerico(), f = d.fields, content = $('dpContent'), signatures = $('dpSignatures'); content.replaceChildren(); signatures.replaceChildren(); $('genericNumberLabel').textContent = activeGenericRecord ? d.number : numeroDocumento(currentDocumentType, f.docDate); $('genericPreviewLabel').textContent = rotuloTipo(currentDocumentType); $('dpNumber').textContent = (d.status === 'draft' ? 'RASCUNHO · ' : rotuloTipo(d.type).toUpperCase() + ' Nº ') + (d.number || numeroDocumento(d.type, f.docDate)); $('dpDate').textContent = (f.docCity || 'Araçariguama/SP') + ', ' + dataLonga(f.docDate || hoje()); $('dpTitle').textContent = f.docTitle || tituloPadraoDocumento(d.type); $('dpRepeatTitle').textContent = f.docTitle || rotuloTipo(d.type); const timbre = d.letterhead || f.docLetterhead || 'none'; $('documentLetterhead').hidden = timbre === 'none'; $('documentPreview').classList.toggle('has-repeat-header', timbre === 'repeat'); $('documentPreview').classList.toggle('has-footer', d.footerEnabled === true); $('dpFooter').hidden = !d.footerEnabled;
     if (d.type === 'declaration') { if (f.docRecipient) adicionarTexto(content, 'Ao(À) ' + f.docRecipient + '.'); adicionarBloco(content, ['Declarante: ' + (f.docDeclarant || 'Não informado'), 'Documento: ' + (f.docDeclarantDocument || 'Não informado'), 'Assunto: ' + (f.docSubject || 'Não informado'), f.docPurpose ? 'Finalidade: ' + f.docPurpose : '']); adicionarTexto(content, f.docBody || 'Preencha o texto da declaração.'); signatures.appendChild(assinaturaElemento(f.docDeclarant || 'Declarante', f.docDeclarantDocument || '')); signatures.appendChild(assinaturaElemento(f.docOperator || operadores[0], 'S.A. Paraíba Imóveis J.R. Ltda.')); }
     if (d.type === 'term') { adicionarBloco(content, ['Primeira parte: ' + (f.docPartyOne || 'Não informada') + (f.docPartyOneDocument ? ' — ' + f.docPartyOneDocument : ''), f.docPartyTwo ? 'Segunda parte: ' + f.docPartyTwo + (f.docPartyTwoDocument ? ' — ' + f.docPartyTwoDocument : '') : '', 'Imóvel/objeto: ' + (f.docProperty || 'Não informado'), f.docRelatedContract ? 'Documento relacionado: ' + f.docRelatedContract : '', f.docEffectiveDate ? 'Data de efeito: ' + dataLonga(f.docEffectiveDate) : '', f.docDeadline ? 'Prazo: ' + f.docDeadline : '', f.docKeysQuantity ? 'Chaves: ' + f.docKeysQuantity : '']); if (f.docTermSubtype === 'rectification') { adicionarTituloSecao(content, 'Retificação'); adicionarTexto(content, 'Onde consta: ' + (f.docCorrectionFrom || '—')); adicionarTexto(content, 'Passa a constar: ' + (f.docCorrectionTo || '—')); adicionarTexto(content, 'Permanecem inalteradas e ratificadas as demais disposições do documento original.'); } adicionarTituloSecao(content, 'Obrigações e condições'); adicionarTexto(content, f.docObligations || 'Preencha as obrigações e condições.'); if (f.docObservations) { adicionarTituloSecao(content, 'Observações'); adicionarTexto(content, f.docObservations); } signatures.appendChild(assinaturaElemento(f.docPartyOne || 'Primeira parte', f.docPartyOneDocument || '')); if (f.docPartyTwo) signatures.appendChild(assinaturaElemento(f.docPartyTwo, f.docPartyTwoDocument || '')); String(f.docSignatures || '').split('\n').map(x => x.trim()).filter(Boolean).forEach(x => signatures.appendChild(assinaturaElemento(x))); signatures.appendChild(assinaturaElemento(f.docOperator || operadores[0], 'Responsável pela emissão')); }
     if (d.type === 'contract') { const sub = f.docContractSubtype || 'lease', party = (key) => f[key + 'Qualification'] || ((f[key] || 'Não informado') + (f[key + 'Document'] ? ' — ' + f[key + 'Document'] : '')); if (sub === 'lease') { adicionarParteContrato(content, 'LOCADOR(A)', party('docLandlord')); adicionarParteContrato(content, 'LOCATÁRIO(A)', party('docTenantParty')); if (f.docGuarantors) adicionarParteContrato(content, 'FIADOR(ES)', f.docGuarantors); } else if (sub === 'sale') { adicionarParteContrato(content, 'VENDEDOR(A)', party('docSeller')); adicionarParteContrato(content, 'COMPRADOR(A)', party('docBuyer')); } else { adicionarParteContrato(content, 'PROPRIETÁRIO(A)', party('docLandlord')); adicionarParteContrato(content, 'ADMINISTRADORA', 'S.A. Paraíba Imóveis J.R. Ltda. — CNPJ 09.534.406/0001-29'); } adicionarTituloSecao(content, 'Objeto'); adicionarTexto(content, f.docContractProperty || 'Preencha o imóvel ou objeto do contrato.'); adicionarBloco(content, [f.docContractPurpose ? 'Finalidade: ' + f.docContractPurpose : '', f.docStartDate ? 'Início: ' + dataLonga(f.docStartDate) : '', f.docEndDate ? 'Término: ' + dataLonga(f.docEndDate) : '', f.docContractValue ? 'Valor: R$ ' + f.docContractValue : '', f.docContractDueDay ? 'Vencimento: dia ' + f.docContractDueDay : '', f.docAdjustment ? 'Reajuste: ' + f.docAdjustment : '', f.docGuarantee ? 'Garantia: ' + f.docGuarantee : '']); adicionarTituloSecao(content, 'Cláusulas e condições'); const ol = document.createElement('ol'); linhasClausulas(f).forEach(texto => { const li = document.createElement('li'); li.textContent = texto; ol.appendChild(li); }); if (!ol.children.length) { const li = document.createElement('li'); li.textContent = 'Adicione as cláusulas do contrato.'; ol.appendChild(li); } content.appendChild(ol); if (sub === 'lease') { signatures.appendChild(assinaturaElemento(f.docLandlord || 'Locador(a)', f.docLandlordDocument || '')); signatures.appendChild(assinaturaElemento(f.docTenantParty || 'Locatário(a)', f.docTenantPartyDocument || '')); } else if (sub === 'sale') { signatures.appendChild(assinaturaElemento(f.docSeller || 'Vendedor(a)', f.docSellerDocument || '')); signatures.appendChild(assinaturaElemento(f.docBuyer || 'Comprador(a)', f.docBuyerDocument || '')); } else { signatures.appendChild(assinaturaElemento(f.docLandlord || 'Proprietário(a)', f.docLandlordDocument || '')); signatures.appendChild(assinaturaElemento(f.docOperator || operadores[0], 'S.A. Paraíba Imóveis J.R. Ltda.')); } if (f.docWitnessOne) signatures.appendChild(assinaturaElemento(f.docWitnessOne, 'Testemunha · ' + (f.docWitnessOneDocument || ''))); if (f.docWitnessTwo) signatures.appendChild(assinaturaElemento(f.docWitnessTwo, 'Testemunha · ' + (f.docWitnessTwoDocument || ''))); }
-    const status = statusDocumento(d); $('documentWatermark').textContent = status === 'draft' ? 'RASCUNHO' : status === 'canceled' ? 'CANCELADO' : status === 'archived' ? 'ARQUIVADO' : ''; $('documentWatermark').hidden = status === 'issued'; $('genericStatus').className = 'generic-status ' + status; $('genericStatus').textContent = status === 'draft' ? (editingGenericDraftId ? 'Rascunho salvo — continue editando ou emita quando estiver pronto.' : 'Rascunho novo — ' + (timbre === 'none' ? 'sem timbre' : 'com timbre') + '.') : rotuloTipo(d.type) + ' ' + d.number + ' — ' + rotuloStatus(status).toLowerCase() + '.'; $('genericPrintBtn').disabled = !activeGenericRecord; $('genericIssueBtn').disabled = !!activeGenericRecord; $('genericSaveDraftBtn').disabled = !!activeGenericRecord; $('genericSaveTemplateBtn').disabled = !!activeGenericRecord; $('genericDuplicateBtn').hidden = !activeGenericRecord; requestAnimationFrame(() => { const paginas = paginarDocumentoPreview(); $('genericPageWarning').textContent = paginas > 1 ? 'Documento multipágina: ' + paginas + ' páginas A4. Campos extensos, cláusulas e assinaturas foram distribuídos automaticamente.' : 'Conteúdo distribuído em uma página A4.'; ajustarAlturaMobile(); });
+    const status = statusDocumento(d); $('documentWatermark').textContent = status === 'draft' ? 'RASCUNHO' : status === 'canceled' ? 'CANCELADO' : status === 'archived' ? 'ARQUIVADO' : ''; $('documentWatermark').hidden = status === 'issued'; $('genericStatus').className = 'generic-status ' + status; $('genericStatus').textContent = status === 'draft' ? (editingGenericDraftId ? 'Rascunho salvo — continue editando ou emita quando estiver pronto.' : 'Rascunho novo — ' + (timbre === 'none' ? 'sem timbre' : 'com timbre') + '.') : rotuloTipo(d.type) + ' ' + d.number + ' — ' + rotuloStatus(status).toLowerCase() + '.'; $('genericPrintBtn').disabled = !activeGenericRecord; $('genericIssueBtn').disabled = !!activeGenericRecord; $('genericSaveDraftBtn').disabled = !!activeGenericRecord; $('genericSaveTemplateBtn').disabled = !!activeGenericRecord; $('genericDuplicateBtn').hidden = !activeGenericRecord; agendarPaginacaoDocumento({ debounce: debouncePagination });
   }
   function travarDocumentoGenerico(travado) { camposGenericosElementos().forEach(el => el.disabled = travado); document.querySelectorAll('[data-clause]').forEach(el => el.disabled = travado); $('docQuickContact').disabled = travado; $('docTemplate').disabled = travado; }
   function salvarRascunhoGenerico() { if (storageCorrupted) { toast('Resolva a recuperação dos dados antes de salvar.', true); return; } const base = dadosDocumentoGenerico(), agora = new Date().toISOString(), registro = normalizarDocumentoGenerico({ ...base, id: editingGenericDraftId || base.id, status: 'draft', updatedAt: agora, createdAt: agora }, { draft: true }); let drafts = state.draftDocuments.filter(x => x.id !== registro.id); drafts.push(registro); if (!persistir({ ...state, draftDocuments: drafts })) return; editingGenericDraftId = registro.id; genericDirty = false; renderHistorico(); atualizarVisaoSeguranca(); atualizarDocumentoGenerico(); toast('Rascunho de ' + rotuloTipo(registro.type).toLowerCase() + ' salvo.'); }
@@ -1033,10 +1201,11 @@
   }
   function assuntoDocumentoGenerico(d) { return d.type === 'declaration' ? d.fields.docSubject : d.type === 'term' ? d.fields.docProperty : d.fields.docContractProperty; }
   function confirmarDocumentoGenerico(d) {
+    finalizarPaginacaoDocumento();
     const agora = new Date().toISOString(), registro = normalizarDocumentoGenerico({ ...d, status: 'issued', createdAt: agora, updatedAt: agora, printCount: 0, lastPrintedAt: '' });
     const chave = chaveContadorDocumento(d.type, d.year), seq = proximaSequenciaDocumento(d.type, d.year), documents = [...state.documents, registro], draftDocuments = state.draftDocuments.filter(x => x.id !== editingGenericDraftId);
     if (!persistir({ ...state, documents, draftDocuments, documentCounters: { ...state.documentCounters, [chave]: seq + 1 }, meta: { ...state.meta, defaultOperator: d.operator } })) return false;
-    activeGenericRecord = Object.freeze({ ...registro }); editingGenericDraftId = ''; genericDirty = false; travarDocumentoGenerico(true); renderHistorico(); atualizarVisaoSeguranca(); atualizarDocumentoGenerico(); toast(rotuloTipo(d.type) + ' ' + d.number + ' emitido e registrado.');
+    activeGenericRecord = Object.freeze({ ...registro }); editingGenericDraftId = ''; genericDirty = false; travarDocumentoGenerico(true); renderHistorico(); atualizarVisaoSeguranca(); atualizarDocumentoGenerico(); finalizarPaginacaoDocumento(); toast(rotuloTipo(d.type) + ' ' + d.number + ' emitido e registrado.');
     return registro;
   }
   function emitirDocumentoGenerico() {
@@ -1046,6 +1215,7 @@
     if (!mostrarErrosGenericos(erros)) { toast('Confira os campos indicados antes de emitir.', true); return; }
     d.number = numeroDocumento(d.type, d.fields.docDate); d.year = Number(d.fields.docDate.slice(0, 4));
     if (numeroDocumentoEmUso(d.number)) { atualizarDocumentoGenerico(); toast('A numeração foi atualizada. Confira e tente novamente.', true); return; }
+    finalizarPaginacaoDocumento();
     const reviewedSignature = assinaturaDocumentoGenerico(d), selectedTemplate = $('docTemplate').selectedOptions[0];
     solicitarRevisaoEmissao({
       title: 'Revisar emissão de ' + rotuloTipo(d.type).toLowerCase(),
@@ -1062,6 +1232,7 @@
       ],
       consequence: 'O número será reservado somente ao emitir. O conteúdo ficará travado e preservado no histórico.',
       validate: () => {
+        finalizarPaginacaoDocumento();
         state = lerEstado();
         const current = dadosDocumentoGenerico(); current.number = numeroDocumento(current.type, current.fields.docDate); current.year = Number(current.fields.docDate.slice(0, 4));
         const currentErrors = validarDocumentoGenerico(current);
@@ -1082,7 +1253,28 @@
   async function excluirRascunhoGenerico(id) { const confirmed = await solicitarAcao({ title: 'Excluir rascunho?', description: 'As alterações deste rascunho serão removidas e não poderão ser recuperadas.', confirmLabel: 'Excluir rascunho', danger: true }); if (!confirmed) return; const drafts = state.draftDocuments.filter(x => x.id !== id); if (!persistir({ ...state, draftDocuments: drafts })) return; if (editingGenericDraftId === id) { editingGenericDraftId = ''; genericDirty = false; } renderHistorico(); atualizarVisaoSeguranca(); toast('Rascunho excluído.'); }
   function nomeArquivoDocumento(r) { const nome = normalizarTexto(nomePrincipalDocumento(r)).split(' ').filter(Boolean).slice(0, 4).map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('_') || 'Documento'; return rotuloTipo(r.type).replace(/ç/g, 'c').replace(/ã/g, 'a') + '_' + (r.status === 'canceled' ? 'CANCELADO_' : '') + String(r.number || 'Rascunho').replace('/', '-') + '_' + nome; }
   function registrarImpressaoDocumento(id) { state = lerEstado(); const agora = new Date().toISOString(), documents = state.documents.map(r => r.id === id ? { ...r, printCount: (Number(r.printCount) || 0) + 1, lastPrintedAt: agora } : r); if (!persistir({ ...state, documents })) return; if (activeGenericRecord && activeGenericRecord.id === id) activeGenericRecord = Object.freeze({ ...documents.find(r => r.id === id) }); renderHistorico(); }
-  function imprimirDocumentoGenerico() { if (!activeGenericRecord) { toast('Emita e registre o documento antes de imprimir.', true); return; } const anterior = document.title, nome = nomeArquivoDocumento(activeGenericRecord); document.title = nome; document.body.classList.add('printing-generic'); document.documentElement.classList.add('printing-generic'); atualizarDocumentoGenerico(); paginarDocumentoPreview(); let restaurado = false; const restaurar = () => { if (restaurado) return; restaurado = true; document.title = anterior; document.body.classList.remove('printing-generic'); document.documentElement.classList.remove('printing-generic'); }; const id = activeGenericRecord.id; window.addEventListener('afterprint', () => { registrarImpressaoDocumento(id); restaurar(); }, { once: true }); setTimeout(restaurar, 5000); toast('Nome sugerido para o PDF: ' + nome + '.pdf'); window.print(); }
+  function imprimirDocumentoGenerico() {
+    if (!activeGenericRecord) { toast('Emita e registre o documento antes de imprimir.', true); return; }
+    const anterior = document.title, nome = nomeArquivoDocumento(activeGenericRecord);
+    document.title = nome;
+    document.body.classList.add('printing-generic');
+    document.documentElement.classList.add('printing-generic');
+    atualizarDocumentoGenerico();
+    finalizarPaginacaoDocumento();
+    let restaurado = false;
+    const restaurar = () => {
+      if (restaurado) return;
+      restaurado = true;
+      document.title = anterior;
+      document.body.classList.remove('printing-generic');
+      document.documentElement.classList.remove('printing-generic');
+    };
+    const id = activeGenericRecord.id;
+    window.addEventListener('afterprint', () => { registrarImpressaoDocumento(id); restaurar(); }, { once: true });
+    setTimeout(restaurar, 5000);
+    toast('Nome sugerido para o PDF: ' + nome + '.pdf');
+    window.print();
+  }
   async function salvarModeloAtual() { if (currentDocumentType === 'receipt') { toast('O recibo possui modelo institucional fixo.', true); return; } const result = await solicitarAcao({ title: 'Salvar modelo personalizado', description: `Dê um nome claro ao novo modelo de ${rotuloTipo(currentDocumentType).toLowerCase()}.`, confirmLabel: 'Salvar modelo', fields: [{ name: 'name', label: 'Nome do modelo', maxLength: 120 }], validate: values => clean(values.name).length >= 3 ? { ok: true } : { ok: false, fieldErrors: { name: 'Informe um nome com pelo menos 3 caracteres.' } } }); if (!result) return; const agora = new Date().toISOString(), modelo = normalizarModelo({ id: idDocumento(), name: clean(result.name), type: currentDocumentType, fields: coletarCamposGenericos(), active: true, createdAt: agora, updatedAt: agora }); if (!persistir({ ...state, templates: [...state.templates, modelo] })) return; atualizarOpcoesModelos(); $('docTemplate').value = modelo.id; renderModelos(); atualizarVisaoSeguranca(); toast('Modelo personalizado salvo.'); }
   function renderModelos() {
     const box = $('templatesList'); if (!box) return;
@@ -1745,10 +1937,10 @@
   $('docQuickContact').addEventListener('change', aplicarCadastroDocumento);
   $('docTemplate').addEventListener('change', aplicarModeloSelecionado);
   document.querySelectorAll('[data-document-type]').forEach(btn => btn.addEventListener('click', () => selecionarTipoDocumento(btn.dataset.documentType)));
-  camposGenericosElementos().forEach(el => { const evento = (el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'date') ? 'change' : 'input'; el.addEventListener(evento, () => { genericDirty = true; const err = $(el.id + 'Error'); if (err) err.textContent = ''; el.setAttribute('aria-invalid', 'false'); if (el.id === 'docTermSubtype' || el.id === 'docContractSubtype') { const atual = String($('docTitle').value || '').toUpperCase(); if (!atual || atual.startsWith('TERMO') || atual.startsWith('CONTRATO')) $('docTitle').value = tituloPadraoDocumento(currentDocumentType); atualizarCamposCondicionais(); } atualizarDocumentoGenerico(); }); });
+  camposGenericosElementos().forEach(el => { const evento = (el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'date') ? 'change' : 'input'; el.addEventListener(evento, () => { genericDirty = true; const err = $(el.id + 'Error'); if (err) err.textContent = ''; el.setAttribute('aria-invalid', 'false'); if (el.id === 'docTermSubtype' || el.id === 'docContractSubtype') { const atual = String($('docTitle').value || '').toUpperCase(); if (!atual || atual.startsWith('TERMO') || atual.startsWith('CONTRATO')) $('docTitle').value = tituloPadraoDocumento(currentDocumentType); atualizarCamposCondicionais(); } atualizarDocumentoGenerico({ debouncePagination: evento === 'input' }); }); });
   document.querySelectorAll('[data-clause]').forEach(el => el.addEventListener('change', () => { genericDirty = true; atualizarDocumentoGenerico(); }));
   document.querySelectorAll('[data-client-role]').forEach(select => select.addEventListener('change', aplicarClienteContrato));
-  ['docDeclarantDocument', 'docPartyOneDocument', 'docPartyTwoDocument', 'docLandlordDocument', 'docTenantPartyDocument', 'docSellerDocument', 'docBuyerDocument', 'docWitnessOneDocument', 'docWitnessTwoDocument'].forEach(id => $(id).addEventListener('input', e => { e.target.value = mascaraDocumento(e.target.value); genericDirty = true; atualizarDocumentoGenerico(); }));
+  ['docDeclarantDocument', 'docPartyOneDocument', 'docPartyTwoDocument', 'docLandlordDocument', 'docTenantPartyDocument', 'docSellerDocument', 'docBuyerDocument', 'docWitnessOneDocument', 'docWitnessTwoDocument'].forEach(id => $(id).addEventListener('input', e => { e.target.value = mascaraDocumento(e.target.value); genericDirty = true; atualizarDocumentoGenerico({ debouncePagination: true }); }));
   $('confirmIssueBtn').addEventListener('click', confirmarRevisaoEmissao);
   $('cancelIssueBtn').addEventListener('click', cancelarRevisao);
   $('actionModalConfirm').addEventListener('click', confirmarModalAcao);

@@ -486,6 +486,7 @@ test('pagina contratos longos e quebra campos extensos na prévia e na impressã
   await page.locator('#docContractProperty').fill(`Imóvel demonstrativo ${tokenLongo}`);
   await page.locator('#docCustomClauses').fill(clausulas);
   await page.locator('#docFooterEnabled').setChecked(true, { force: true });
+  if (await page.locator('#previewMobileBtn').isVisible()) await page.locator('#previewMobileBtn').click();
 
   await expect(page.locator('#genericPageWarning')).toContainText(/\b[2-9]\d* páginas A4\b/);
 
@@ -499,12 +500,22 @@ test('pagina contratos longos e quebra campos extensos na prévia e na impressã
     const verticallyClipped = pages
       .map((sheet, pageIndex) => ({ pageIndex, clientHeight: sheet.clientHeight, scrollHeight: sheet.scrollHeight }))
       .filter(({ clientHeight, scrollHeight }) => scrollHeight > clientHeight + 1);
-    return { pageCount: pages.length, overflowing, verticallyClipped };
+    return {
+      pageCount: pages.length,
+      overflowing,
+      verticallyClipped,
+      flowText: pages.map(sheet => sheet.querySelector('.document-page-flow')?.textContent || '').join('\n'),
+      signatures: pages.flatMap(sheet => [...sheet.querySelectorAll('.document-signature strong')].map(element => element.textContent)),
+      footerCounts: pages.map(sheet => sheet.querySelectorAll('.document-footer').length)
+    };
   });
 
   expect(preview.pageCount).toBeGreaterThan(1);
   expect(preview.overflowing).toEqual([]);
   expect(preview.verticallyClipped).toEqual([]);
+  expect(preview.flowText.indexOf('Trecho extenso')).toBeLessThan(preview.flowText.indexOf('12. Cláusula demonstrativa'));
+  expect(preview.signatures).toEqual(expect.arrayContaining(['Pessoa Locadora de Teste', 'Pessoa Locatária de Teste']));
+  expect(preview.footerCounts.every(count => count === 1)).toBe(true);
 
   await page.evaluate(() => {
     document.documentElement.classList.add('printing-generic');
@@ -1266,4 +1277,307 @@ test('cancela e arquiva documentos sem diálogos nativos', async ({ page }) => {
   expect(persisted.documents.find(record => record.number === 'DECL-001/2026').status).toBe('canceled');
   expect(persisted.documents.find(record => record.number === 'DECL-002/2026').status).toBe('archived');
   expect(nativeDialogs).toEqual([]);
+});
+
+test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
+  test('reproduz perda de texto com o espaçamento da WCAG 1.4.12', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    await carregarEstadoGestao(page, estadoGestao({
+      draftDocuments: [{
+        id: 'rascunho-wcag-1412',
+        type: 'declaration',
+        status: 'draft',
+        updatedAt: '2026-09-25T10:00:00.000Z',
+        fields: {
+          docTitle: 'Declaração demonstrativa com título operacional extenso que precisa permanecer integralmente legível'
+        }
+      }]
+    }));
+    await page.addStyleTag({ content: `
+      #view-management {
+        line-height: 1.5 !important;
+        letter-spacing: 0.12em !important;
+        word-spacing: 0.16em !important;
+      }
+      #view-management p { margin-bottom: 2em !important; }
+    ` });
+
+    const clipping = await page.locator('#managementContinue .management-row strong').evaluate(element => {
+      const style = getComputedStyle(element);
+      return {
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        overflow: style.overflow,
+        textOverflow: style.textOverflow,
+        whiteSpace: style.whiteSpace
+      };
+    });
+
+    expect(clipping).toMatchObject({
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
+    });
+    expect(clipping.scrollWidth).toBeGreaterThan(clipping.clientWidth);
+  });
+
+  test('reproduz navegação por setas atravessando grupos ARIA de abas', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    await selecionarAba(page, /Novo documento/i);
+    const issueGroupToggle = page.getByRole('button', { name: 'Emitir', exact: true });
+    if (await issueGroupToggle.getAttribute('aria-expanded') !== 'true') await issueGroupToggle.click();
+    const source = page.locator('#tab-new');
+    await source.focus();
+    await expect(source).toBeFocused();
+
+    const sourceGroup = await source.evaluate(element =>
+      element.closest('[role="tablist"]')?.getAttribute('aria-label')
+    );
+    await page.keyboard.press('ArrowRight');
+    const destination = await page.evaluate(() => ({
+      id: document.activeElement?.id,
+      group: document.activeElement?.closest('[role="tablist"]')?.getAttribute('aria-label')
+    }));
+
+    expect(sourceGroup).toBe('Emitir');
+    expect(destination).toEqual({ id: 'tab-management', group: 'Acompanhar' });
+    expect(destination.group).not.toBe(sourceGroup);
+  });
+
+  test('reproduz labels sem controle associado', async ({ page }) => {
+    const orphanLabels = await page.locator('label').evaluateAll(labels => labels
+      .filter(label => {
+        const control = label.htmlFor
+          ? document.getElementById(label.htmlFor)
+          : label.querySelector('button, input, meter, output, progress, select, textarea');
+        return !control;
+      })
+      .map(label => label.textContent.trim().replace(/\s+/g, ' '))
+    );
+
+    expect(orphanLabels).toEqual([
+      'Valor por extenso',
+      'Rodapé institucional',
+      'Biblioteca de cláusulas'
+    ]);
+  });
+
+  test('reproduz controles de formatação e reordenação com menos de 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    await selecionarAba(page, /Modelos/i);
+
+    const undersizedTargets = await page
+      .locator('.template-toolbar button, .template-field-actions button')
+      .evaluateAll(elements => elements
+        .filter(element => element.getClientRects().length)
+        .map(element => {
+          const rect = element.getBoundingClientRect();
+          return {
+            name: element.getAttribute('aria-label') || element.textContent.trim(),
+            width: rect.width,
+            height: rect.height
+          };
+        })
+        .filter(({ width, height }) => width < 44 || height < 44)
+      );
+
+    expect(undersizedTargets.map(({ name }) => name)).toEqual([
+      'Mover campo 1 para cima',
+      'Mover campo 1 para baixo',
+      'Negrito',
+      'Itálico',
+      'Sublinhado'
+    ]);
+    expect(undersizedTargets.every(({ width }) => width < 44)).toBe(true);
+  });
+});
+
+test.describe('Fase 1 — agendamento e finalização da paginação A4', () => {
+  async function preencherContratoGenericoValido(page, customClauses = 'Cláusula demonstrativa suficiente para validar a emissão do contrato.') {
+    await selecionarAba(page, /Novo documento/i);
+    await page.getByRole('button', { name: 'Contrato', exact: true }).click();
+    await page.locator('#docLandlord').fill('Pessoa Locadora de Teste');
+    await page.locator('#docTenantParty').fill('Pessoa Locatária de Teste');
+    await page.locator('#docContractProperty').fill('Imóvel demonstrativo para paginação');
+    await page.locator('#docCustomClauses').fill(customClauses);
+  }
+
+  test('consolida dez entradas rápidas em no máximo duas paginações', async ({ page, context }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    await preencherContratoGenericoValido(page);
+    const preview = page.locator('#documentPagesPreview');
+    await expect(preview).toHaveAttribute('aria-busy', 'false');
+    const session = testInfo.project.name === 'chromium' ? await context.newCDPSession(page) : null;
+    if (session) await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+
+    try {
+      await page.evaluate(() => {
+        window.__auditPaginationRuns = 0;
+        const originalReplaceChildren = Element.prototype.replaceChildren;
+        Element.prototype.replaceChildren = function (...nodes) {
+          if (this.id === 'documentPagesPreview') window.__auditPaginationRuns += 1;
+          return originalReplaceChildren.apply(this, nodes);
+        };
+        const field = document.querySelector('#docCustomClauses');
+        const start = performance.now();
+        window.__auditPaginationResult = new Promise(resolve => {
+          document.addEventListener('document-preview:paginated', () => resolve({
+            runs: window.__auditPaginationRuns,
+            elapsed: performance.now() - start,
+            text: document.querySelector('#documentPagesPreview').textContent
+          }), { once: true });
+        });
+        for (let index = 1; index <= 10; index += 1) {
+          field.value = `Entrada rápida final ${index}`;
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+
+      await expect(preview).toHaveAttribute('aria-busy', 'true');
+      const result = await page.evaluate(() => window.__auditPaginationResult);
+      await expect(preview).toHaveAttribute('aria-busy', 'false');
+
+      expect(result.runs).toBeGreaterThan(0);
+      expect(result.runs).toBeLessThanOrEqual(2);
+      expect(result.elapsed).toBeLessThan(300);
+      expect(result.text).toContain('Entrada rápida final 10');
+    } finally {
+      if (session) {
+        await session.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+        await session.detach();
+      }
+    }
+  });
+
+  test('finaliza a paginação pendente antes de abrir a revisão', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    await preencherContratoGenericoValido(page);
+    await expect(page.locator('#documentPagesPreview')).toHaveAttribute('aria-busy', 'false');
+
+    const stateAtReview = await page.evaluate(() => {
+      window.__auditPaginationRuns = 0;
+      const originalReplaceChildren = Element.prototype.replaceChildren;
+      Element.prototype.replaceChildren = function (...nodes) {
+        if (this.id === 'documentPagesPreview') window.__auditPaginationRuns += 1;
+        return originalReplaceChildren.apply(this, nodes);
+      };
+      const field = document.querySelector('#docCustomClauses');
+      field.value = 'Cláusula final presente na revisão e na prévia definitiva.';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('#genericIssueBtn').click();
+      const preview = document.querySelector('#documentPagesPreview');
+      return {
+        modalVisible: !document.querySelector('#confirmModal').hidden,
+        paginationRuns: window.__auditPaginationRuns,
+        busy: preview.getAttribute('aria-busy'),
+        previewText: preview.textContent
+      };
+    });
+
+    expect(stateAtReview).toMatchObject({
+      modalVisible: true,
+      paginationRuns: 1,
+      busy: 'false'
+    });
+    expect(stateAtReview.previewText).toContain('Cláusula final presente na revisão');
+  });
+
+  test('mantém a paginação suspensa no mobile e a conclui ao abrir a prévia', async ({ page }) => {
+    await page.setViewportSize({ width: 380, height: 844 });
+    await selecionarAba(page, /Novo documento/i);
+    await page.getByRole('button', { name: 'Contrato', exact: true }).click();
+
+    const stateWhileClosed = await page.evaluate(async () => {
+      window.__auditPaginationRuns = 0;
+      const originalReplaceChildren = Element.prototype.replaceChildren;
+      Element.prototype.replaceChildren = function (...nodes) {
+        if (this.id === 'documentPagesPreview') window.__auditPaginationRuns += 1;
+        return originalReplaceChildren.apply(this, nodes);
+      };
+      const field = document.querySelector('#docCustomClauses');
+      for (let index = 1; index <= 10; index += 1) {
+        field.value = `Conteúdo mobile mais recente ${index}`;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      const footer = document.querySelector('#docFooterEnabled');
+      footer.checked = !footer.checked;
+      footer.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return {
+        runs: window.__auditPaginationRuns,
+        busy: document.querySelector('#documentPagesPreview').getAttribute('aria-busy')
+      };
+    });
+
+    expect(stateWhileClosed).toEqual({ runs: 0, busy: 'true' });
+    await page.locator('#previewMobileBtn').click();
+    await expect(page.locator('#documentPagesPreview')).toHaveAttribute('aria-busy', 'false');
+    const stateAfterOpen = await page.evaluate(() => ({
+      runs: window.__auditPaginationRuns,
+      text: document.querySelector('#documentPagesPreview').textContent
+    }));
+    expect(stateAfterOpen.runs).toBe(1);
+    expect(stateAfterOpen.text).toContain('Conteúdo mobile mais recente 10');
+  });
+
+  test('finaliza uma paginação pendente uma única vez antes de imprimir', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    await preencherContratoGenericoValido(page);
+    await page.locator('#genericIssueBtn').click();
+    await confirmarRevisao(page);
+    await expect(page.locator('#genericPrintBtn')).toBeEnabled();
+    await expect(page.locator('#documentPagesPreview')).toHaveAttribute('aria-busy', 'false');
+
+    const printEvents = await page.evaluate(async () => {
+      const events = [];
+      const originalReplaceChildren = Element.prototype.replaceChildren;
+      Element.prototype.replaceChildren = function (...nodes) {
+        if (this.id === 'documentPagesPreview') events.push('paginate');
+        return originalReplaceChildren.apply(this, nodes);
+      };
+      window.print = () => events.push('print');
+      const field = document.querySelector('#docTitle');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('#genericPrintBtn').click();
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return events;
+    });
+
+    expect(printEvents).toEqual(['paginate', 'print']);
+  });
+
+  test('pagina uma atualização longa abaixo de 200 ms com CPU 4×', async ({ page, context }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 844 });
+    const clauses = Array.from({ length: 10 }, (_, index) =>
+      `${index + 1}. Cláusula extensa para medir a paginação final sob limitação de CPU. `.repeat(6)
+    ).join('\n\n');
+    await preencherContratoGenericoValido(page, clauses);
+    await expect(page.locator('#documentPagesPreview')).toHaveAttribute('aria-busy', 'false');
+    if (testInfo.project.name !== 'chromium') {
+      expect(await page.locator('[data-document-preview-page]').count()).toBeGreaterThan(1);
+      return;
+    }
+
+    const session = await context.newCDPSession(page);
+    await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    try {
+      const metrics = [];
+      for (const enabled of [true, false, true]) {
+        await page.evaluate(() => {
+          window.__nextPaginationMetric = new Promise(resolve =>
+            document.addEventListener('document-preview:paginated', event => resolve(event.detail), { once: true })
+          );
+        });
+        await page.locator('#docFooterEnabled').setChecked(enabled);
+        metrics.push(await page.evaluate(() => window.__nextPaginationMetric));
+      }
+      expect(metrics.every(metric => metric.pageCount > 1)).toBe(true);
+      const durations = metrics.map(metric => metric.duration).sort((a, b) => a - b);
+      expect(durations[1]).toBeLessThan(200);
+      expect(durations[2]).toBeLessThan(300);
+    } finally {
+      await session.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await session.detach();
+    }
+  });
 });
