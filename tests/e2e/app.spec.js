@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const storageKey = 'paraibaImoveisRecibosV3';
 
@@ -17,7 +18,7 @@ async function selecionarAba(page, name) {
   if (await toggle.isVisible() && await toggle.getAttribute('aria-expanded') !== 'true') {
     await toggle.click();
   }
-  const aba = page.getByRole('tab', { name });
+  const aba = page.locator('.app-tabs [data-view]').filter({ hasText: name }).first();
   const texto = name instanceof RegExp ? name.source : String(name);
   const grupo = /novo documento/i.test(texto) ? 'Emitir' : /gestão|dossiês|histórico/i.test(texto) ? 'Acompanhar' : 'Administrar';
   const gatilho = page.getByRole('button', { name: grupo, exact: true });
@@ -51,6 +52,23 @@ async function preencherReciboValido(page) {
 async function confirmarRevisao(page) {
   await expect(page.locator('#confirmModal')).toBeVisible();
   await page.locator('#confirmIssueBtn').click();
+}
+
+async function esperarSemViolacoesAxeGraves(page, include) {
+  let builder = new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .setLegacyMode(true);
+  for (const selector of Array.isArray(include) ? include : include ? [include] : []) builder = builder.include(selector);
+  const results = await builder.analyze();
+  const violations = results.violations
+    .filter(({ impact }) => impact === 'critical' || impact === 'serious')
+    .map(({ id, impact, help, nodes }) => ({
+      id,
+      impact,
+      help,
+      targets: nodes.map(node => node.target)
+    }));
+  expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
 }
 
 test('carrega o gerador com a gestão como centro de navegação', async ({ page }) => {
@@ -138,13 +156,11 @@ test('mantém os oito destinos acessíveis no menu móvel em 767 px e 380 px', a
     const menu = page.locator('#appMenuToggle');
     await expect(menu).toBeVisible();
     await menu.click();
-    await expect(page.locator('#appTabs [role="tab"]')).toHaveCount(8);
+    await expect(page.locator('#appTabs [data-view]')).toHaveCount(8);
     await page.getByRole('button', { name: 'Acompanhar', exact: true }).click();
-    await page.getByRole('tab', { name: /Dossiês/i }).click();
-    await expect(page.locator('#tab-management')).toHaveAttribute('aria-selected', 'false');
-    await expect(page.locator('#tab-management')).toHaveAttribute('tabindex', '-1');
-    await expect(page.locator('#tab-dossiers')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#tab-dossiers')).toHaveAttribute('tabindex', '0');
+    await page.getByRole('button', { name: /Dossiês/i }).click();
+    await expect(page.locator('#tab-management')).not.toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#tab-dossiers')).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('#view-dossiers')).toBeVisible();
   }
 });
@@ -600,7 +616,7 @@ test('quebra o menu no tablet e o recolhe em um controle expansível no celular'
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#appTabs')).toBeVisible();
   await page.getByRole('button', { name: 'Emitir', exact: true }).click();
-  await page.getByRole('tab', { name: /Novo documento/i }).focus();
+  await page.locator('#tab-new').focus();
   await page.keyboard.press('Enter');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('#view-new')).toBeVisible();
@@ -615,14 +631,14 @@ test('condensa os destinos em menus dropdown acessíveis', async ({ page }) => {
   await expect(emitir).toBeVisible();
   await expect(acompanhar).toBeVisible();
   await expect(administrar).toBeVisible();
-  await expect(page.getByRole('tab', { name: /Histórico/i })).toBeHidden();
+  await expect(page.getByRole('button', { name: /Histórico/i })).toBeHidden();
 
   await acompanhar.click();
   await expect(acompanhar).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByRole('tab', { name: /Gestão/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Gestão/i })).toBeVisible();
   await administrar.click();
   await expect(acompanhar).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByRole('tab', { name: /Cadastros/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Cadastros/i })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(administrar).toHaveAttribute('aria-expanded', 'false');
   await expect(administrar).toBeFocused();
@@ -1110,27 +1126,25 @@ test('cancela o modal de cancelamento com Escape sem alterar o recibo', async ({
   expect(persisted.history[0].cancelReason || '').toBe('');
 });
 
-test('navega por todas as abas, inclusive Gestão e Dossiês, com setas, Home e End', async ({ page }) => {
+test('mantém navegação comum por Tab, Shift+Tab e Enter sem capturar setas', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 900 });
-  const management = page.getByRole('tab', { name: /Gestão/i });
-  const create = page.getByRole('tab', { name: /Novo documento/i });
-  const dossiers = page.getByRole('tab', { name: /Dossiês/i });
-  const safety = page.getByRole('tab', { name: /Backup e segurança/i });
+  const management = page.getByRole('button', { name: /Gestão/i });
+  const dossiers = page.getByRole('button', { name: /Dossiês/i });
 
   await page.getByRole('button', { name: 'Acompanhar', exact: true }).click();
   await management.focus();
   await page.keyboard.press('ArrowRight');
+  await expect(management).toBeFocused();
+  await expect(page.locator('#view-management')).toBeVisible();
+
+  await page.keyboard.press('Tab');
   await expect(dossiers).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(management).toBeFocused();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
   await expect(page.locator('#view-dossiers')).toBeVisible();
-  await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: /Histórico/i })).toBeFocused();
-  await expect(page.locator('#view-history')).toBeVisible();
-  await page.keyboard.press('End');
-  await expect(safety).toBeFocused();
-  await expect(page.locator('#view-safety')).toBeVisible();
-  await page.keyboard.press('Home');
-  await expect(create).toBeFocused();
-  await expect(page.locator('#view-new')).toBeVisible();
+  await expect(page.locator('#tab-dossiers')).toHaveAttribute('aria-current', 'page');
 });
 
 test('salva uma visão por modal próprio sem abrir diálogo nativo', async ({ page }) => {
@@ -1321,7 +1335,7 @@ test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
     expect(clipping.scrollWidth).toBeGreaterThan(clipping.clientWidth);
   });
 
-  test('reproduz navegação por setas atravessando grupos ARIA de abas', async ({ page }) => {
+  test('usa navegação agrupada comum sem papéis de abas nem captura de setas', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 844 });
     await selecionarAba(page, /Novo documento/i);
     const issueGroupToggle = page.getByRole('button', { name: 'Emitir', exact: true });
@@ -1330,21 +1344,19 @@ test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
     await source.focus();
     await expect(source).toBeFocused();
 
-    const sourceGroup = await source.evaluate(element =>
-      element.closest('[role="tablist"]')?.getAttribute('aria-label')
-    );
+    const sourceGroup = await source.evaluate(element => element.closest('[role="group"]')?.getAttribute('aria-labelledby'));
     await page.keyboard.press('ArrowRight');
     const destination = await page.evaluate(() => ({
       id: document.activeElement?.id,
-      group: document.activeElement?.closest('[role="tablist"]')?.getAttribute('aria-label')
+      current: document.activeElement?.getAttribute('aria-current')
     }));
 
-    expect(sourceGroup).toBe('Emitir');
-    expect(destination).toEqual({ id: 'tab-management', group: 'Acompanhar' });
-    expect(destination.group).not.toBe(sourceGroup);
+    expect(sourceGroup).toBe('navGroupIssueToggle');
+    expect(destination).toEqual({ id: 'tab-new', current: 'page' });
+    await expect(page.locator('[role="tablist"], [role="tab"], [role="tabpanel"]')).toHaveCount(0);
   });
 
-  test('reproduz labels sem controle associado', async ({ page }) => {
+  test('não mantém labels órfãos e expõe agrupamentos de formulário coerentes', async ({ page }) => {
     const orphanLabels = await page.locator('label').evaluateAll(labels => labels
       .filter(label => {
         const control = label.htmlFor
@@ -1355,11 +1367,11 @@ test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
       .map(label => label.textContent.trim().replace(/\s+/g, ' '))
     );
 
-    expect(orphanLabels).toEqual([
-      'Valor por extenso',
-      'Rodapé institucional',
-      'Biblioteca de cláusulas'
-    ]);
+    expect(orphanLabels).toEqual([]);
+    await expect(page.locator('#amountWords')).toHaveAttribute('for', 'amount');
+    await expect(page.locator('#amountWords')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.locator('fieldset.clause-library > legend')).toHaveText('Biblioteca de cláusulas');
+    await expect(page.getByLabel('Incluir rodapé institucional no documento')).toHaveCount(1);
   });
 
   test('reproduz controles de formatação e reordenação com menos de 44 px', async ({ page }) => {
@@ -1389,6 +1401,74 @@ test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
       'Sublinhado'
     ]);
     expect(undersizedTargets.every(({ width }) => width < 44)).toBe(true);
+  });
+});
+
+test.describe('Fase 2 — semântica e acessibilidade', () => {
+  test('mantém IDs únicos e todas as referências ARIA válidas', async ({ page }) => {
+    const navigation = page.getByRole('navigation', { name: 'Áreas do gerador', includeHidden: true });
+    await expect(navigation).toHaveCount(1);
+    for (const group of ['Emitir', 'Acompanhar', 'Administrar']) {
+      await expect(navigation.getByRole('group', { name: group, includeHidden: true })).toHaveCount(1);
+    }
+
+    const diagnostics = await page.evaluate(() => {
+      const allIds = [...document.querySelectorAll('[id]')].map(element => element.id);
+      const duplicateIds = [...new Set(allIds.filter((id, index) => allIds.indexOf(id) !== index))];
+      const referenceAttributes = ['aria-controls', 'aria-describedby', 'aria-labelledby', 'aria-owns', 'for'];
+      const missingReferences = [];
+
+      document.querySelectorAll(referenceAttributes.map(attribute => `[${attribute}]`).join(',')).forEach(element => {
+        referenceAttributes.forEach(attribute => {
+          const value = element.getAttribute(attribute);
+          if (!value) return;
+          value.split(/\s+/).filter(Boolean).forEach(id => {
+            if (!document.getElementById(id)) missingReferences.push({ element: element.id || element.tagName, attribute, id });
+          });
+        });
+      });
+
+      return { duplicateIds, missingReferences };
+    });
+
+    expect(diagnostics).toEqual({ duplicateIds: [], missingReferences: [] });
+  });
+
+  const destinations = [
+    { name: /Novo documento/i, label: 'Novo documento', group: 'Emitir', id: 'tab-new' },
+    { name: /^Gestão$/i, label: 'Gestão', group: 'Acompanhar', id: 'tab-management' },
+    { name: /Dossiês/i, label: 'Dossiês', group: 'Acompanhar', id: 'tab-dossiers' },
+    { name: /Histórico/i, label: 'Histórico', group: 'Acompanhar', id: 'tab-history' },
+    { name: /Cadastros/i, label: 'Cadastros', group: 'Administrar', id: 'tab-contacts' },
+    { name: /Clientes/i, label: 'Clientes', group: 'Administrar', id: 'tab-clients' },
+    { name: /Modelos/i, label: 'Modelos', group: 'Administrar', id: 'tab-templates' },
+    { name: /Backup e segurança/i, label: 'Backup e segurança', group: 'Administrar', id: 'tab-safety' }
+  ];
+
+  for (const destination of destinations) {
+    test(`não encontra violações críticas ou sérias na área ${destination.label}`, async ({ page }) => {
+      if (destination.id === 'tab-templates') test.setTimeout(60_000);
+      await selecionarAba(page, destination.name);
+      await expect(page.locator(`#${destination.id}`)).toHaveAttribute('aria-current', 'page');
+      await expect(page.locator('.app-tabs [aria-current="page"]')).toHaveCount(1);
+      const menuToggle = page.locator('#appMenuToggle');
+      if (await menuToggle.isVisible() && await menuToggle.getAttribute('aria-expanded') !== 'true') await menuToggle.click();
+      const groupToggle = page.getByRole('button', { name: destination.group, exact: true });
+      if (await groupToggle.getAttribute('aria-expanded') !== 'true') await groupToggle.click();
+      await expect(page.locator(`#${await groupToggle.getAttribute('aria-controls')}`)).toHaveCSS('opacity', '1');
+      await esperarSemViolacoesAxeGraves(page, ['#appTabs', `#view-${destination.id.replace('tab-', '')}`]);
+      await page.keyboard.press('Escape');
+    });
+  }
+
+  test('não encontra violações críticas ou sérias nos modais abertos', async ({ page }) => {
+    for (const modalId of ['confirmModal', 'actionModal', 'cancelModal', 'managementStatusModal', 'managementLockModal']) {
+      await page.evaluate(id => window.paraibaDocumentApp.openModal(id), modalId);
+      await expect(page.locator(`#${modalId}`)).toBeVisible();
+      await esperarSemViolacoesAxeGraves(page, `#${modalId}`);
+      await page.evaluate(id => window.paraibaDocumentApp.closeModal(id), modalId);
+      await expect(page.locator(`#${modalId}`)).toBeHidden();
+    }
   });
 });
 

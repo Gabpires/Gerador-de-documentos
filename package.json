@@ -19,6 +19,7 @@
     "check": "npm run test:api && npm run test"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.58.2",
     "vite": "^7.3.1"
   }

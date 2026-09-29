@@ -166,21 +166,21 @@
   function findDossier(state, management, targetId) { return dossiers(state, management).find(item => item.id === targetId); }
   function docsForDossier(state, management, targetId) { return allDocuments(state).filter(record => documentDossierId(record, management) === targetId); }
 
-  function addTab(id, label, group, beforeId) {
+  function addDestination(id, label, group, beforeId) {
     const tab = document.createElement('button');
-    tab.type = 'button'; tab.role = 'tab'; tab.id = `tab-${id}`; tab.dataset.view = id;
-    tab.setAttribute('aria-controls', `view-${id}`); tab.setAttribute('aria-selected', 'false'); tab.tabIndex = -1; tab.textContent = label;
+    tab.type = 'button'; tab.id = `tab-${id}`; tab.dataset.view = id;
+    tab.setAttribute('aria-controls', `view-${id}`); tab.textContent = label;
     const nav = $(`tabGroup${group}`) || document.querySelector('.app-tabs');
     const before = beforeId && $(beforeId);
     nav.insertBefore(tab, before || null);
   }
   function createViews() {
-    addTab('management', 'Gestão', 'Follow', 'tab-history');
-    addTab('dossiers', 'Dossiês', 'Follow', 'tab-history');
+    addDestination('management', 'Gestão', 'Follow', 'tab-history');
+    addDestination('dossiers', 'Dossiês', 'Follow', 'tab-history');
     const root = $('mainContent');
     const management = document.createElement('section');
     management.className = 'view-panel'; management.id = 'view-management'; management.dataset.panel = 'management'; management.hidden = true;
-    management.setAttribute('role', 'tabpanel'); management.setAttribute('aria-labelledby', 'tab-management');
+    management.setAttribute('aria-labelledby', 'tab-management');
     management.innerHTML = `
       <div class="management-layout">
         <section class="content-card management-workbench" aria-labelledby="managementTitle"><div class="management-heading"><h2 id="managementTitle">Gestão documental</h2><p>Escolha a próxima tarefa; os recursos de consulta e administração continuam disponíveis abaixo.</p></div><div id="managementEmptyState" class="management-empty-state" hidden></div><div class="management-task-grid"><section class="management-task management-task-primary" aria-labelledby="managementIssueTitle"><h3 id="managementIssueTitle">Emitir agora</h3><p>Abra um novo documento e siga para preenchimento, revisão e emissão.</p><div class="header-actions"><button class="btn btn-primary" type="button" id="managementNewDocumentBtn">Novo documento</button><button class="btn btn-secondary" type="button" id="openDossiersBtn">Criar dossiê</button></div></section><section class="management-task" aria-labelledby="managementContinueTitle"><h3 id="managementContinueTitle">Continuar trabalho</h3><div id="managementContinue" class="management-list"></div></section><section class="management-task" aria-labelledby="managementPendingTitle"><h3 id="managementPendingTitle">Pendências</h3><div id="managementPending" class="management-list"></div><div id="managementBatchAction"></div></section></div></section>
@@ -191,7 +191,7 @@
       </div>`;
     const dossier = document.createElement('section');
     dossier.className = 'view-panel'; dossier.id = 'view-dossiers'; dossier.dataset.panel = 'dossiers'; dossier.hidden = true;
-    dossier.setAttribute('role', 'tabpanel'); dossier.setAttribute('aria-labelledby', 'tab-dossiers');
+    dossier.setAttribute('aria-labelledby', 'tab-dossiers');
     dossier.innerHTML = `
       <div class="content-card wide-card"><div class="content-header"><div><span class="eyebrow">Centro da navegação</span><h2>Dossiês por imóvel e contrato</h2><p>Contratos, partes, recibos, anexos e eventos organizados no mesmo lugar.</p></div><button class="btn btn-primary" id="toggleDossierForm" type="button" aria-expanded="false" aria-controls="dossierForm">Novo dossiê</button></div>
       <form id="dossierForm" class="dossier-form" hidden><div class="grid2"><label class="field">Imóvel <input id="dossierProperty" required maxlength="1500" /></label><label class="field">Código do contrato <input id="dossierContractCode" maxlength="80" /></label></div><div class="grid2"><label class="field">Locatário / parte principal <input id="dossierTenant" maxlength="200" /></label><label class="field">CPF/CNPJ <input id="dossierTenantDocument" inputmode="numeric" maxlength="18" /></label></div><div class="grid2"><label class="field">Proprietário <input id="dossierOwner" maxlength="200" /></label><label class="field">Término do contrato <input id="dossierEndDate" type="date" /></label></div><div class="grid2"><label class="field">Valor mensal <input id="dossierAmount" inputmode="decimal" placeholder="Ex.: 950,00" /></label><label class="field">Pagamento <select id="dossierPayment"><option>Dinheiro</option><option>Pix</option><option>Dinheiro/PIX</option><option>Transferência bancária</option><option>Boleto</option></select></label></div><div class="grid2"><label class="field">Vencimento mensal <input id="dossierDueDay" type="number" min="1" max="31" /></label><label class="field">Etiquetas <input id="dossierTags" placeholder="Separe por vírgula" /></label></div><label class="field">Observações <textarea id="dossierNotes" rows="3"></textarea></label><div class="modal-actions"><button class="btn btn-secondary" type="button" id="cancelDossierBtn">Cancelar</button><button class="btn btn-primary" type="submit">Salvar dossiê</button></div></form><div id="dossierCreationTipSlot"></div>

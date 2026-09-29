@@ -88,7 +88,8 @@ select {
 .field {
   margin-bottom: 14px;
 }
-.field label {
+.field label,
+.field .field-label {
   display: block;
   font-size: 13px;
   font-weight: 700;
@@ -749,7 +750,7 @@ select {
   font-weight: 400;
 }
 #receipt .empty {
-  color: #777;
+  color: #6b6b6b;
   font-style: normal;
 }
 
@@ -1384,7 +1385,7 @@ summary:focus-visible,
 .app-tabs button:hover {
   background: #f3f4f6;
 }
-.app-tabs button[aria-selected='true'] {
+.app-tabs button[aria-current='page'] {
   background: var(--brand);
   color: #fff;
   box-shadow: 0 5px 14px rgba(183, 13, 24, 0.2);
@@ -1525,7 +1526,8 @@ summary:focus-visible,
 .field {
   margin-bottom: 13px;
 }
-.field label {
+.field label,
+.field .field-label {
   font-size: 12px;
 }
 .field input,
@@ -2853,7 +2855,17 @@ summary:focus-visible,
 .clause-library {
   display: grid;
   gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
   margin-bottom: 13px;
+}
+.clause-library legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: #30343b;
+  font-size: 12px;
+  font-weight: 700;
 }
 .check-row {
   display: flex;

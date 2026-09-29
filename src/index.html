@@ -52,6 +52,7 @@
             <button
               class="tab-group-toggle"
               type="button"
+              id="navGroupIssueToggle"
               aria-expanded="false"
               aria-controls="tabGroupIssue"
             >
@@ -60,15 +61,14 @@
             <div
               class="tab-group-items"
               id="tabGroupIssue"
-              role="tablist"
-              aria-label="Emitir"
+              role="group"
+              aria-labelledby="navGroupIssueToggle"
             >
               <button
                 type="button"
-                role="tab"
                 id="tab-new"
                 aria-controls="view-new"
-                aria-selected="true"
+                aria-current="page"
                 aria-keyshortcuts="Alt+N"
                 data-view="new"
               >
@@ -80,6 +80,7 @@
             <button
               class="tab-group-toggle"
               type="button"
+              id="navGroupFollowToggle"
               aria-expanded="false"
               aria-controls="tabGroupFollow"
             >
@@ -88,15 +89,13 @@
             <div
               class="tab-group-items"
               id="tabGroupFollow"
-              role="tablist"
-              aria-label="Acompanhar"
+              role="group"
+              aria-labelledby="navGroupFollowToggle"
             >
               <button
                 type="button"
-                role="tab"
                 id="tab-history"
                 aria-controls="view-history"
-                aria-selected="false"
                 aria-keyshortcuts="Alt+H"
                 data-view="history"
               >
@@ -108,6 +107,7 @@
             <button
               class="tab-group-toggle"
               type="button"
+              id="navGroupAdminToggle"
               aria-expanded="false"
               aria-controls="tabGroupAdmin"
             >
@@ -116,45 +116,37 @@
             <div
               class="tab-group-items"
               id="tabGroupAdmin"
-              role="tablist"
-              aria-label="Administrar"
+              role="group"
+              aria-labelledby="navGroupAdminToggle"
             >
               <button
                 type="button"
-                role="tab"
                 id="tab-contacts"
                 aria-controls="view-contacts"
-                aria-selected="false"
                 data-view="contacts"
               >
                 Cadastros
               </button>
               <button
                 type="button"
-                role="tab"
                 id="tab-clients"
                 aria-controls="view-clients"
-                aria-selected="false"
                 data-view="clients"
               >
                 Clientes
               </button>
               <button
                 type="button"
-                role="tab"
                 id="tab-templates"
                 aria-controls="view-templates"
-                aria-selected="false"
                 data-view="templates"
               >
                 Modelos
               </button>
               <button
                 type="button"
-                role="tab"
                 id="tab-safety"
                 aria-controls="view-safety"
-                aria-selected="false"
                 data-view="safety"
               >
                 Backup e segurança
@@ -202,7 +194,6 @@
         <section
           class="view-panel is-active"
           id="view-new"
-          role="tabpanel"
           aria-labelledby="tab-new"
           data-panel="new"
         >
@@ -467,14 +458,18 @@
                         ></div>
                       </div>
                       <div class="field">
-                        <label>Valor por extenso</label>
-                        <div
+                        <span class="field-label" id="amountWordsLabel"
+                          >Valor por extenso</span
+                        >
+                        <output
                           class="extenso"
                           id="amountWords"
+                          for="amount"
+                          aria-labelledby="amountWordsLabel"
                           aria-live="polite"
                         >
                           —
-                        </div>
+                        </output>
                       </div>
                       <div class="grid2">
                         <div class="field">
@@ -825,14 +820,13 @@
                           </aside>
                         </div>
                         <div class="field">
-                          <label>Rodapé institucional</label
-                          ><label class="inline-check"
+                          <label class="inline-check"
                             ><input
                               id="docFooterEnabled"
                               data-generic-field
                               type="checkbox"
                             />
-                            Incluir no documento</label
+                            Incluir rodapé institucional no documento</label
                           >
                         </div>
                       </div>
@@ -1400,8 +1394,8 @@
                             placeholder="Ex.: caução, fiador ou seguro-fiança"
                           />
                         </div>
-                        <label>Biblioteca de cláusulas</label>
-                        <div class="clause-library">
+                        <fieldset class="clause-library">
+                          <legend>Biblioteca de cláusulas</legend>
                           <label class="check-row"
                             ><input type="checkbox" data-clause="payment" />
                             Pagamento, vencimento e encargos por atraso</label
@@ -1418,7 +1412,7 @@
                             ><input type="checkbox" data-clause="inspection" />
                             Vistoria e responsabilidade por danos</label
                           >
-                        </div>
+                        </fieldset>
                         <div class="field">
                           <label for="docCustomClauses"
                             >Cláusulas personalizadas
@@ -1535,7 +1529,7 @@
               class="workspace"
               aria-label="Prévia do documento"
               aria-keyshortcuts="Alt+P"
-              tabindex="-1"
+              tabindex="0"
             >
               <div id="receiptPreviewArea">
                 <div class="preview-toolbar">
@@ -1723,7 +1717,6 @@
         <section
           class="view-panel"
           id="view-history"
-          role="tabpanel"
           aria-labelledby="tab-history"
           data-panel="history"
           hidden
@@ -1858,7 +1851,6 @@
         <section
           class="view-panel"
           id="view-contacts"
-          role="tabpanel"
           aria-labelledby="tab-contacts"
           data-panel="contacts"
           hidden
@@ -1910,7 +1902,6 @@
         <section
           class="view-panel"
           id="view-clients"
-          role="tabpanel"
           aria-labelledby="tab-clients"
           data-panel="clients"
           hidden
@@ -2129,7 +2120,6 @@
         <section
           class="view-panel"
           id="view-templates"
-          role="tabpanel"
           aria-labelledby="tab-templates"
           data-panel="templates"
           hidden
@@ -2185,7 +2175,6 @@
         <section
           class="view-panel"
           id="view-safety"
-          role="tabpanel"
           aria-labelledby="tab-safety"
           data-panel="safety"
           hidden

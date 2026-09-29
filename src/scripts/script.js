@@ -573,8 +573,8 @@
     const grupo = tab?.closest('.tab-group'); if (!grupo) return;
     fecharGruposDeNavegacao(grupo); definirGrupoDeNavegacao(grupo, true);
     if (focar) {
-      const abas = [...grupo.querySelectorAll('[role="tab"]')];
-      (ultimo ? abas.at(-1) : grupo.querySelector('[role="tab"][aria-selected="true"]') || abas[0])?.focus();
+      const destinos = [...grupo.querySelectorAll('[data-view]')];
+      (ultimo ? destinos.at(-1) : grupo.querySelector('[aria-current="page"]') || destinos[0])?.focus();
     }
   }
   function menuAppAberto() { return $('appTabs').closest('.app-tabs-shell').classList.contains('is-open'); }
@@ -582,7 +582,7 @@
   function fecharMenuApp() { definirMenuApp(false); }
   function ativarView(nome, { focar = false } = {}) {
     const tab = $('tab-' + nome), panel = $('view-' + nome); if (!tab || !panel) return; currentView = nome;
-    document.querySelectorAll('.app-tabs [role="tab"]').forEach(item => { const ativo = item === tab; item.setAttribute('aria-selected', ativo ? 'true' : 'false'); item.tabIndex = ativo ? 0 : -1; });
+    document.querySelectorAll('.app-tabs [data-view]').forEach(item => { if (item === tab) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current'); });
     atualizarGrupoAtivo(tab);
     document.querySelectorAll('.view-panel').forEach(item => { const ativo = item === panel; item.hidden = !ativo; item.classList.toggle('is-active', ativo); }); fecharMenuApp(); fecharPreview();
     if (nome === 'history') renderHistorico(); if (nome === 'contacts') renderGerenciadorCadastros(); if (nome === 'clients') renderGerenciadorClientes(); if (nome === 'templates') renderModelos(); if (nome === 'safety') { atualizarBackupStatus(); atualizarVisaoSeguranca(); } if (nome === 'new') setTimeout(ajustarAlturaMobile, 0); if (focar) { if (window.matchMedia('(max-width: 767px)').matches) definirMenuApp(true); abrirGrupoDaAba(tab, { focar: true }); } document.dispatchEvent(new CustomEvent('app:viewchange', { detail: { view: nome } })); window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -1401,7 +1401,7 @@
     if (originalMenu && document.contains(originalMenu) && !originalMenu.closest('[hidden]')) { originalMenu.open = true; return original; }
     const id = state?.trigger?.id, label = state?.trigger?.getAttribute?.('aria-label'), triggerText = clean(state?.trigger?.textContent);
     const candidates = [...document.querySelectorAll('button,[role="button"],a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(element => !element.closest('[hidden]') && element.offsetParent !== null);
-    return candidates.find(element => id && element.id === id) || candidates.find(element => label && element.getAttribute('aria-label') === label) || candidates.find(element => triggerText && clean(element.textContent) === triggerText) || document.querySelector('.app-tabs [role="tab"][aria-selected="true"]');
+    return candidates.find(element => id && element.id === id) || candidates.find(element => label && element.getAttribute('aria-label') === label) || candidates.find(element => triggerText && clean(element.textContent) === triggerText) || document.querySelector('.app-tabs [aria-current="page"]');
   }
   function fecharModal(id, { restoreFocus = true } = {}) {
     const modal = $(id); if (!modal) return;
@@ -2045,8 +2045,13 @@
   document.addEventListener('click', event => {
     const dismissTip = event.target.closest('[data-dismiss-contextual-tip]');
     if (dismissTip) { dispensarDicaContextual(dismissTip.dataset.dismissContextualTip); return; }
-    const tab = event.target.closest('.app-tabs [role="tab"]');
-    if (tab) { ativarView(tab.dataset.view); fecharMenuApp(); return; }
+    const tab = event.target.closest('.app-tabs [data-view]');
+    if (tab) {
+      const returnFocus = window.matchMedia('(max-width: 767px)').matches ? $('appMenuToggle') : tab.closest('.tab-group')?.querySelector('.tab-group-toggle');
+      ativarView(tab.dataset.view); fecharMenuApp();
+      requestAnimationFrame(() => returnFocus?.focus());
+      return;
+    }
     const toggleGrupo = event.target.closest('.tab-group-toggle');
     if (toggleGrupo) {
       const grupo = toggleGrupo.closest('.tab-group');
@@ -2065,26 +2070,12 @@
       if (event.key === 'Escape') {
         event.preventDefault(); event.stopImmediatePropagation(); definirGrupoDeNavegacao(grupo, false); toggleGrupo.focus(); return;
       }
-      if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
-        event.preventDefault();
-        if (event.key === 'Enter' || event.key === ' ') {
-          const abrir = !grupo.classList.contains('is-open');
-          fecharGruposDeNavegacao(grupo); definirGrupoDeNavegacao(grupo, abrir);
-          if (abrir) abrirGrupoDaAba(grupo.querySelector('[role="tab"]'), { focar: true });
-        } else abrirGrupoDaAba(grupo.querySelector('[role="tab"]'), { focar: true, ultimo: event.key === 'ArrowUp' });
-      }
       return;
     }
-    const tab = event.target.closest?.('.app-tabs [role="tab"]'); if (!tab) return;
+    const tab = event.target.closest?.('.app-tabs [data-view]'); if (!tab) return;
     if (event.key === 'Escape') {
       event.preventDefault(); event.stopImmediatePropagation(); const grupo = tab.closest('.tab-group'); definirGrupoDeNavegacao(grupo, false); grupo?.querySelector('.tab-group-toggle')?.focus(); return;
     }
-    const tabs = [...document.querySelectorAll('.app-tabs [role="tab"]')], index = tabs.indexOf(tab); let destination = -1;
-    if (event.key === 'ArrowRight') destination = (index + 1) % tabs.length;
-    else if (event.key === 'ArrowLeft') destination = (index - 1 + tabs.length) % tabs.length;
-    else if (event.key === 'Home') destination = 0;
-    else if (event.key === 'End') destination = tabs.length - 1;
-    if (destination >= 0) { event.preventDefault(); ativarView(tabs[destination].dataset.view, { focar: true }); }
   });
   document.addEventListener('keydown', event => {
     if (event.defaultPrevented || event.repeat || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
