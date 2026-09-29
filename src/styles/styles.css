@@ -2417,10 +2417,16 @@ summary:focus-visible,
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  border-block: 1px solid var(--border);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
 }
 .management-kpi {
-  padding: 11px 14px;
+  display: grid;
+  align-content: start;
+  min-height: 96px;
+  padding: 15px 18px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2430,13 +2436,25 @@ summary:focus-visible,
   border-left: 1px solid var(--border);
 }
 .management-kpi strong {
-  margin: 3px 0;
+  margin: 5px 0 4px;
   color: var(--text);
-  font-size: 17px;
+  font-size: clamp(20px, 1.6vw, 24px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
-.management-kpi span,
+.management-kpi span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+}
 .management-kpi small {
-  font-size: 10.5px;
+  align-self: end;
+  color: #56616e;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
 }
 .management-disclosure {
   padding: 0;
@@ -2524,8 +2542,7 @@ summary:focus-visible,
   }
   .management-task + .management-task,
   .management-kpi + .management-kpi {
-    padding-top: 16px;
-    padding-left: 0;
+    padding: 15px 18px;
     border-top: 1px solid var(--border);
     border-left: 0;
   }
@@ -3541,7 +3558,7 @@ summary:focus-visible,
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
-.management-kpi {
+.management-kpis .management-kpi {
   min-width: 0;
   padding: 16px;
   border: 1px solid var(--border);
@@ -3549,14 +3566,14 @@ summary:focus-visible,
   background: #fff;
   box-shadow: var(--ui-shadow);
 }
-.management-kpi span,
-.management-kpi small {
+.management-kpis .management-kpi span,
+.management-kpis .management-kpi small {
   display: block;
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 750;
 }
-.management-kpi strong {
+.management-kpis .management-kpi strong {
   display: block;
   margin: 7px 0 4px;
   overflow: hidden;
@@ -4069,35 +4086,6 @@ summary:focus-visible,
     text-align: center;
     font-size: 11px;
     line-height: 1.2;
-  }
-}
-
-/* Densidade final da Gestão: indicadores informam, sem competir com tarefas. */
-.management-kpi {
-  padding: 11px 14px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.management-kpi + .management-kpi {
-  border-left: 1px solid var(--border);
-}
-.management-kpi strong {
-  margin: 3px 0;
-  color: var(--text);
-  font-size: 17px;
-}
-.management-kpi span,
-.management-kpi small {
-  font-size: 10.5px;
-}
-@media (max-width: 767px) {
-  .management-kpi + .management-kpi {
-    padding-top: 16px;
-    padding-left: 14px;
-    border-top: 1px solid var(--border);
-    border-left: 0;
   }
 }
 
