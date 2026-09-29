@@ -498,14 +498,31 @@
     $('saveContactBtn').disabled = travado;
     $('deleteContactBtn').disabled = travado || !$('savedTenant').value;
   }
+  function gruposDeNavegacao() { return [...document.querySelectorAll('.tab-group')]; }
+  function definirGrupoDeNavegacao(grupo, aberto) {
+    if (!grupo) return;
+    grupo.classList.toggle('is-open', aberto);
+    grupo.querySelector('.tab-group-toggle')?.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+  }
+  function fecharGruposDeNavegacao(excecao = null) { gruposDeNavegacao().forEach(grupo => { if (grupo !== excecao) definirGrupoDeNavegacao(grupo, false); }); }
+  function atualizarGrupoAtivo(tab) { gruposDeNavegacao().forEach(grupo => grupo.classList.toggle('has-active-tab', grupo.contains(tab))); }
+  function abrirGrupoDaAba(tab, { focar = false, ultimo = false } = {}) {
+    const grupo = tab?.closest('.tab-group'); if (!grupo) return;
+    fecharGruposDeNavegacao(grupo); definirGrupoDeNavegacao(grupo, true);
+    if (focar) {
+      const abas = [...grupo.querySelectorAll('[role="tab"]')];
+      (ultimo ? abas.at(-1) : grupo.querySelector('[role="tab"][aria-selected="true"]') || abas[0])?.focus();
+    }
+  }
   function menuAppAberto() { return $('appTabs').closest('.app-tabs-shell').classList.contains('is-open'); }
-  function definirMenuApp(aberto) { const shell = $('appTabs').closest('.app-tabs-shell'), toggle = $('appMenuToggle'); shell.classList.toggle('is-open', aberto); toggle.setAttribute('aria-expanded', aberto ? 'true' : 'false'); toggle.setAttribute('aria-label', aberto ? 'Fechar menu de navegação' : 'Abrir menu de navegação'); }
+  function definirMenuApp(aberto) { const shell = $('appTabs').closest('.app-tabs-shell'), toggle = $('appMenuToggle'); shell.classList.toggle('is-open', aberto); toggle.setAttribute('aria-expanded', aberto ? 'true' : 'false'); toggle.setAttribute('aria-label', aberto ? 'Fechar menu de navegação' : 'Abrir menu de navegação'); if (!aberto) fecharGruposDeNavegacao(); }
   function fecharMenuApp() { definirMenuApp(false); }
   function ativarView(nome, { focar = false } = {}) {
     const tab = $('tab-' + nome), panel = $('view-' + nome); if (!tab || !panel) return; currentView = nome;
     document.querySelectorAll('.app-tabs [role="tab"]').forEach(item => { const ativo = item === tab; item.setAttribute('aria-selected', ativo ? 'true' : 'false'); item.tabIndex = ativo ? 0 : -1; });
+    atualizarGrupoAtivo(tab);
     document.querySelectorAll('.view-panel').forEach(item => { const ativo = item === panel; item.hidden = !ativo; item.classList.toggle('is-active', ativo); }); fecharMenuApp(); fecharPreview();
-    if (nome === 'history') renderHistorico(); if (nome === 'contacts') renderGerenciadorCadastros(); if (nome === 'clients') renderGerenciadorClientes(); if (nome === 'templates') renderModelos(); if (nome === 'safety') { atualizarBackupStatus(); atualizarVisaoSeguranca(); } if (nome === 'new') setTimeout(ajustarAlturaMobile, 0); if (focar) tab.focus(); document.dispatchEvent(new CustomEvent('app:viewchange', { detail: { view: nome } })); window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (nome === 'history') renderHistorico(); if (nome === 'contacts') renderGerenciadorCadastros(); if (nome === 'clients') renderGerenciadorClientes(); if (nome === 'templates') renderModelos(); if (nome === 'safety') { atualizarBackupStatus(); atualizarVisaoSeguranca(); } if (nome === 'new') setTimeout(ajustarAlturaMobile, 0); if (focar) { if (window.matchMedia('(max-width: 767px)').matches) definirMenuApp(true); abrirGrupoDaAba(tab, { focar: true }); } document.dispatchEvent(new CustomEvent('app:viewchange', { detail: { view: nome } })); window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
   function abrirPreview() { document.body.classList.add('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'true'); setTimeout(() => { ajustarAlturaMobile(); $(currentDocumentType === 'receipt' ? 'previewCloseBtn' : 'genericPreviewCloseBtn').focus(); }, 0); }
   function fecharPreview() { const aberta = document.body.classList.contains('preview-open'); document.body.classList.remove('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'false'); if (aberta) setTimeout(ajustarAlturaMobile, 0); }
@@ -1775,11 +1792,38 @@
   document.addEventListener('click', event => {
     const tab = event.target.closest('.app-tabs [role="tab"]');
     if (tab) { ativarView(tab.dataset.view); fecharMenuApp(); return; }
+    const toggleGrupo = event.target.closest('.tab-group-toggle');
+    if (toggleGrupo) {
+      const grupo = toggleGrupo.closest('.tab-group');
+      const abrir = !grupo.classList.contains('is-open');
+      fecharGruposDeNavegacao(grupo); definirGrupoDeNavegacao(grupo, abrir);
+      return;
+    }
+    if (!event.target.closest('.tab-group')) fecharGruposDeNavegacao();
     const backdrop = event.target.classList?.contains('modal-backdrop') ? event.target : null;
     if (backdrop && modalSuperior() === backdrop) solicitarFechamentoModal(backdrop, 'backdrop');
   });
   document.addEventListener('keydown', event => {
+    const toggleGrupo = event.target.closest?.('.tab-group-toggle');
+    if (toggleGrupo) {
+      const grupo = toggleGrupo.closest('.tab-group');
+      if (event.key === 'Escape') {
+        event.preventDefault(); event.stopImmediatePropagation(); definirGrupoDeNavegacao(grupo, false); toggleGrupo.focus(); return;
+      }
+      if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(event.key)) {
+        event.preventDefault();
+        if (event.key === 'Enter' || event.key === ' ') {
+          const abrir = !grupo.classList.contains('is-open');
+          fecharGruposDeNavegacao(grupo); definirGrupoDeNavegacao(grupo, abrir);
+          if (abrir) abrirGrupoDaAba(grupo.querySelector('[role="tab"]'), { focar: true });
+        } else abrirGrupoDaAba(grupo.querySelector('[role="tab"]'), { focar: true, ultimo: event.key === 'ArrowUp' });
+      }
+      return;
+    }
     const tab = event.target.closest?.('.app-tabs [role="tab"]'); if (!tab) return;
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopImmediatePropagation(); const grupo = tab.closest('.tab-group'); definirGrupoDeNavegacao(grupo, false); grupo?.querySelector('.tab-group-toggle')?.focus(); return;
+    }
     const tabs = [...document.querySelectorAll('.app-tabs [role="tab"]')], index = tabs.indexOf(tab); let destination = -1;
     if (event.key === 'ArrowRight') destination = (index + 1) % tabs.length;
     else if (event.key === 'ArrowLeft') destination = (index - 1 + tabs.length) % tabs.length;

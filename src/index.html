@@ -35,15 +35,17 @@
         >
           <span aria-hidden="true">☰</span> Menu
         </button>
-        <nav
-          class="app-tabs"
-          id="appTabs"
-          role="tablist"
-          aria-label="Áreas do gerador"
-        >
-          <div class="tab-group" role="presentation">
-            <span class="tab-group-label">Emitir</span>
-            <div class="tab-group-items" id="tabGroupIssue" role="presentation">
+        <nav class="app-tabs" id="appTabs" aria-label="Áreas do gerador">
+          <div class="tab-group" data-navigation-group="issue">
+            <button
+              class="tab-group-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="tabGroupIssue"
+            >
+              Emitir <span aria-hidden="true">⌄</span>
+            </button>
+            <div class="tab-group-items" id="tabGroupIssue" role="tablist" aria-label="Emitir">
               <button
                 type="button"
                 role="tab"
@@ -54,9 +56,16 @@
               >Novo documento</button>
             </div>
           </div>
-          <div class="tab-group" role="presentation">
-            <span class="tab-group-label">Acompanhar</span>
-            <div class="tab-group-items" id="tabGroupFollow" role="presentation">
+          <div class="tab-group" data-navigation-group="follow">
+            <button
+              class="tab-group-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="tabGroupFollow"
+            >
+              Acompanhar <span aria-hidden="true">⌄</span>
+            </button>
+            <div class="tab-group-items" id="tabGroupFollow" role="tablist" aria-label="Acompanhar">
               <button
                 type="button"
                 role="tab"
@@ -67,9 +76,16 @@
               >Histórico</button>
             </div>
           </div>
-          <div class="tab-group" role="presentation">
-            <span class="tab-group-label">Administrar</span>
-            <div class="tab-group-items" id="tabGroupAdmin" role="presentation">
+          <div class="tab-group" data-navigation-group="admin">
+            <button
+              class="tab-group-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="tabGroupAdmin"
+            >
+              Administrar <span aria-hidden="true">⌄</span>
+            </button>
+            <div class="tab-group-items" id="tabGroupAdmin" role="tablist" aria-label="Administrar">
               <button
                 type="button"
                 role="tab"

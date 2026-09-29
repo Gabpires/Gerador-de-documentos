@@ -17,7 +17,12 @@ async function selecionarAba(page, name) {
   if (await toggle.isVisible() && await toggle.getAttribute('aria-expanded') !== 'true') {
     await toggle.click();
   }
-  await page.getByRole('tab', { name }).click();
+  const aba = page.getByRole('tab', { name });
+  const texto = name instanceof RegExp ? name.source : String(name);
+  const grupo = /novo documento/i.test(texto) ? 'Emitir' : /gestão|dossiês|histórico/i.test(texto) ? 'Acompanhar' : 'Administrar';
+  const gatilho = page.getByRole('button', { name: grupo, exact: true });
+  if (await gatilho.getAttribute('aria-expanded') !== 'true') await gatilho.click();
+  await aba.click();
 }
 
 function estadoGestao(overrides = {}) {
@@ -133,7 +138,8 @@ test('mantém os oito destinos acessíveis no menu móvel em 767 px e 380 px', a
     const menu = page.locator('#appMenuToggle');
     await expect(menu).toBeVisible();
     await menu.click();
-    await expect(page.getByRole('tab')).toHaveCount(8);
+    await expect(page.locator('#appTabs [role="tab"]')).toHaveCount(8);
+    await page.getByRole('button', { name: 'Acompanhar', exact: true }).click();
     await page.getByRole('tab', { name: /Dossiês/i }).click();
     await expect(page.locator('#tab-management')).toHaveAttribute('aria-selected', 'false');
     await expect(page.locator('#tab-management')).toHaveAttribute('tabindex', '-1');
@@ -470,10 +476,33 @@ test('quebra o menu no tablet e o recolhe em um controle expansível no celular'
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#appTabs')).toBeVisible();
+  await page.getByRole('button', { name: 'Emitir', exact: true }).click();
   await page.getByRole('tab', { name: /Novo documento/i }).focus();
   await page.keyboard.press('Enter');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('#view-new')).toBeVisible();
+});
+
+test('condensa os destinos em menus dropdown acessíveis', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  const emitir = page.getByRole('button', { name: 'Emitir', exact: true });
+  const acompanhar = page.getByRole('button', { name: 'Acompanhar', exact: true });
+  const administrar = page.getByRole('button', { name: 'Administrar', exact: true });
+
+  await expect(emitir).toBeVisible();
+  await expect(acompanhar).toBeVisible();
+  await expect(administrar).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Histórico/i })).toBeHidden();
+
+  await acompanhar.click();
+  await expect(acompanhar).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('tab', { name: /Gestão/i })).toBeVisible();
+  await administrar.click();
+  await expect(acompanhar).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('tab', { name: /Cadastros/i })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(administrar).toHaveAttribute('aria-expanded', 'false');
+  await expect(administrar).toBeFocused();
 });
 
 test('mantém os controles essenciais visíveis sem rolagem horizontal', async ({ page, isMobile }) => {
@@ -484,7 +513,7 @@ test('mantém os controles essenciais visíveis sem rolagem horizontal', async (
     await expect(page.locator('#receipt')).toBeVisible();
   }
 
-  await expect(isMobile ? page.locator('#appMenuToggle') : page.getByRole('tab', { name: /Novo documento/i })).toBeVisible();
+  await expect(isMobile ? page.locator('#appMenuToggle') : page.getByRole('button', { name: 'Emitir', exact: true })).toBeVisible();
   const pageWidth = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth
@@ -690,6 +719,7 @@ test('navega por todas as abas, inclusive Gestão e Dossiês, com setas, Home e 
   const dossiers = page.getByRole('tab', { name: /Dossiês/i });
   const safety = page.getByRole('tab', { name: /Backup e segurança/i });
 
+  await page.getByRole('button', { name: 'Acompanhar', exact: true }).click();
   await management.focus();
   await page.keyboard.press('ArrowRight');
   await expect(dossiers).toBeFocused();

@@ -3961,3 +3961,119 @@ summary:focus-visible,
     border-left: 0;
   }
 }
+
+/* Navegação compacta: cada categoria abre somente seus destinos. */
+.app-tabs {
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+}
+.tab-group {
+  position: relative;
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.app-tabs .tab-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 9px 13px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #4f5966;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.app-tabs .tab-group-toggle:hover,
+.tab-group.has-active-tab .tab-group-toggle {
+  border-color: #efd5d8;
+  background: #fff7f7;
+  color: var(--brand);
+}
+.tab-group.is-open .tab-group-toggle {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(183, 13, 24, 0.2);
+}
+.tab-group-toggle span {
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.16s ease;
+}
+.tab-group.is-open .tab-group-toggle span {
+  transform: rotate(180deg);
+}
+.tab-group-items {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 90;
+  display: grid;
+  min-width: 192px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 30px rgba(22, 29, 37, 0.15);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.tab-group.is-open .tab-group-items {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.app-tabs .tab-group-items button {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 11px;
+  text-align: left;
+  white-space: normal;
+}
+@media (max-width: 767px) {
+  .app-tabs {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    padding-top: 8px;
+  }
+  .tab-group {
+    width: 100%;
+  }
+  .app-tabs .tab-group-toggle {
+    width: 100%;
+    min-height: 44px;
+    justify-content: space-between;
+    padding-inline: 13px;
+    border-color: #e7ebf0;
+    background: #f3f4f6;
+  }
+  .tab-group-items {
+    position: static;
+    min-width: 0;
+    margin-top: 5px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 10px;
+    box-shadow: none;
+    transform: none;
+  }
+  .tab-group.is-open .tab-group-items {
+    transform: none;
+  }
+  .app-tabs .tab-group-items button {
+    min-height: 44px;
+  }
+}
