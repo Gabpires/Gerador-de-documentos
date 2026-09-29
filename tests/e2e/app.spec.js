@@ -779,6 +779,31 @@ test('cria template HTML, gera formulário dinâmico e congela snapshot na emiss
   expect(frozen.templateSnapshot.renderedHtml).toBe(originalSnapshot);
 });
 
+test('imprime o snapshot emitido pelo menu do histórico', async ({ page }) => {
+  const templateName = 'Documento dinâmico para impressão';
+  const snapshotHtml = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif}</style></head><body><h1>Snapshot para impressão</h1></body></html>';
+  await carregarEstadoGestao(page, estadoGestao({
+    documents: [{
+      id: 'documento-dinamico-impressao', type: 'custom', dynamic: true, dynamicLabel: templateName,
+      templateId: 'template-impressao', templateVersion: 1, number: '', year: 2026, status: 'issued', fields: {},
+      templateSnapshot: {
+        definition: { schemaVersion: 1, id: 'template-impressao', name: templateName, documentKind: 'custom', status: 'active', revision: 1, fields: [] },
+        html: snapshotHtml,
+        renderedHtml: snapshotHtml
+      },
+      operator: 'Sandra Marcondes da Silva Alves', createdAt: '2026-09-29T12:00:00.000Z', updatedAt: '2026-09-29T12:00:00.000Z', printCount: 0, lastPrintedAt: ''
+    }]
+  }));
+
+  await selecionarAba(page, /Histórico/i);
+  const row = page.locator('.history-item').filter({ hasText: templateName });
+  await row.locator('summary').click();
+  await row.getByRole('button', { name: 'Imprimir snapshot' }).click();
+
+  await expect(page.locator('.dynamic-print-frame')).toHaveAttribute('sandbox', /allow-same-origin/);
+  await expect(page.locator('.dynamic-print-frame')).toHaveCount(0, { timeout: 1_500 });
+});
+
 test('guia pendências do template, mantém rascunho editável e emite somente os campos declarados', async ({ page, isMobile }) => {
   await selecionarAba(page, /Modelos/i);
   await page.locator('#newTemplateBtn').click();

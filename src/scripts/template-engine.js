@@ -347,7 +347,23 @@
   }
   function closeDocument() { activeDocument = null; $('dynamicDocumentHost').hidden = true; document.querySelector('#view-new .app').hidden = false; }
   function openRecord(record) { activeDocument = { template: { definition: record.templateSnapshot.definition, html: record.templateSnapshot.html }, values: record.fields || {}, draftId: record.status === 'draft' ? record.id : '', draftSavedAt: record.updatedAt || record.createdAt || '', validationAttempted: false }; window.paraibaDocumentApp?.activateView('new'); $('dynamicDocumentHost').hidden = false; document.querySelector('#view-new .app').hidden = true; buildDocumentForm(record); }
-  function printSnapshot(html) { if (!html) return; const frame = document.createElement('iframe'); frame.className = 'dynamic-print-frame'; frame.setAttribute('sandbox', 'allow-modals'); frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">${html}`; document.body.append(frame); frame.addEventListener('load', () => { frame.contentWindow?.print(); setTimeout(() => frame.remove(), 1000); }, { once: true }); }
+  function printSnapshot(html) {
+    if (!html) return;
+    const frame = document.createElement('iframe');
+    frame.className = 'dynamic-print-frame';
+    // O snapshot continua sem scripts; a mesma origem só permite chamar print() no iframe.
+    frame.setAttribute('sandbox', 'allow-modals allow-same-origin');
+    frame.addEventListener('load', () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } finally {
+        setTimeout(() => frame.remove(), 1000);
+      }
+    }, { once: true });
+    frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">${html}`;
+    document.body.append(frame);
+  }
   function setupStudio() {
     const view = $('view-templates'); if (!view) return;
     const host = createElement('section', { id: 'templateStudio', className: 'template-studio content-card wide-card' });

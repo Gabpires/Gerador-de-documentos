@@ -11,15 +11,15 @@ export default defineConfig({
     ? [['list'], ['html', { open: 'never' }]]
     : [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: 'http://127.0.0.1:4174',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure'
   },
   webServer: {
-    command: 'npm run dev -- --port 4173',
-    url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    command: 'npm run dev -- --port 4174',
+    url: 'http://127.0.0.1:4174',
+    reuseExistingServer: false,
     env: { ...process.env, RESOURCES_DIR: 'test-results/resources' },
     timeout: 30_000
   },

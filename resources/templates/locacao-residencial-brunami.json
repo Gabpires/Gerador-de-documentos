@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "locacao-residencial-brunami",
+  "name": "Padrão Residencial Brunami",
+  "documentKind": "contract",
+  "status": "active",
+  "revision": 1,
+  "createdAt": "2026-09-29T14:21:45.717Z",
+  "updatedAt": "2026-09-29T14:21:45.717Z",
+  "fields": [
+    {
+      "id": "nome_locatario",
+      "name": "Nome do Locatário",
+      "tag": "{{NOME_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Nome completo do locatário",
+      "helpText": "informar sempre nome completo conforme documento de identidade do locatário",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "cpf_locatario",
+      "name": "CPF do Locatário",
+      "tag": "{{CPF_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Informe CPF",
+      "helpText": "Informar CPF como consta no documento de identidade do locatário",
+      "validation": "cpfCnpj",
+      "options": []
+    },
+    {
+      "id": "nacionalidade_locatario",
+      "name": "Nacionalidade do Locatário",
+      "tag": "{{NACIONALIDADE_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Informar Nacionalidade",
+      "helpText": "Informar a nacionalidade do locatário",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "profissao_locatario",
+      "name": "Profissão do Locatário",
+      "tag": "{{PROFISSAO_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Profissão",
+      "helpText": "Informar a profissão do locatário",
+      "validation": "none",
+      "options": []
+    }
+  ]
+}

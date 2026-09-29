@@ -25,8 +25,14 @@
             role="status"
             aria-live="polite"
             title="Os dados ficam somente neste navegador; não há sincronização."
-            ><span class="storage-indicator-dot" data-storage-dot aria-hidden="true"></span
-            ><span id="storageIndicatorText">Dados neste navegador · sem backup</span></span
+            ><span
+              class="storage-indicator-dot"
+              data-storage-dot
+              aria-hidden="true"
+            ></span
+            ><span id="storageIndicatorText"
+              >Dados neste navegador · sem backup</span
+            ></span
           >
         </div>
       </header>
@@ -51,7 +57,12 @@
             >
               Emitir <span aria-hidden="true">⌄</span>
             </button>
-            <div class="tab-group-items" id="tabGroupIssue" role="tablist" aria-label="Emitir">
+            <div
+              class="tab-group-items"
+              id="tabGroupIssue"
+              role="tablist"
+              aria-label="Emitir"
+            >
               <button
                 type="button"
                 role="tab"
@@ -59,7 +70,9 @@
                 aria-controls="view-new"
                 aria-selected="true"
                 data-view="new"
-              >Novo documento</button>
+              >
+                Novo documento
+              </button>
             </div>
           </div>
           <div class="tab-group" data-navigation-group="follow">
@@ -71,7 +84,12 @@
             >
               Acompanhar <span aria-hidden="true">⌄</span>
             </button>
-            <div class="tab-group-items" id="tabGroupFollow" role="tablist" aria-label="Acompanhar">
+            <div
+              class="tab-group-items"
+              id="tabGroupFollow"
+              role="tablist"
+              aria-label="Acompanhar"
+            >
               <button
                 type="button"
                 role="tab"
@@ -79,7 +97,9 @@
                 aria-controls="view-history"
                 aria-selected="false"
                 data-view="history"
-              >Histórico</button>
+              >
+                Histórico
+              </button>
             </div>
           </div>
           <div class="tab-group" data-navigation-group="admin">
@@ -91,7 +111,12 @@
             >
               Administrar <span aria-hidden="true">⌄</span>
             </button>
-            <div class="tab-group-items" id="tabGroupAdmin" role="tablist" aria-label="Administrar">
+            <div
+              class="tab-group-items"
+              id="tabGroupAdmin"
+              role="tablist"
+              aria-label="Administrar"
+            >
               <button
                 type="button"
                 role="tab"
@@ -99,7 +124,9 @@
                 aria-controls="view-contacts"
                 aria-selected="false"
                 data-view="contacts"
-              >Cadastros</button>
+              >
+                Cadastros
+              </button>
               <button
                 type="button"
                 role="tab"
@@ -107,7 +134,9 @@
                 aria-controls="view-clients"
                 aria-selected="false"
                 data-view="clients"
-              >Clientes</button>
+              >
+                Clientes
+              </button>
               <button
                 type="button"
                 role="tab"
@@ -115,7 +144,9 @@
                 aria-controls="view-templates"
                 aria-selected="false"
                 data-view="templates"
-              >Modelos</button>
+              >
+                Modelos
+              </button>
               <button
                 type="button"
                 role="tab"
@@ -123,23 +154,36 @@
                 aria-controls="view-safety"
                 aria-selected="false"
                 data-view="safety"
-              >Backup e segurança</button>
+              >
+                Backup e segurança
+              </button>
             </div>
           </div>
         </nav>
       </div>
       <section
-          class="backup-reminder"
-          id="backupReminder"
-          aria-labelledby="backupReminderTitle"
-          aria-live="polite"
-          hidden
+        class="backup-reminder"
+        id="backupReminder"
+        aria-labelledby="backupReminderTitle"
+        aria-live="polite"
+        hidden
+      >
+        <div>
+          <strong id="backupReminderTitle"
+            >Seu primeiro documento já foi registrado neste navegador.</strong
+          >
+          <p>
+            Ele permanece disponível aqui, mas ainda não há uma exportação de
+            backup registrada.
+          </p>
+        </div>
+        <button
+          class="btn btn-primary"
+          type="button"
+          id="backupReminderExportBtn"
         >
-          <div>
-            <strong id="backupReminderTitle">Seu primeiro documento já foi registrado neste navegador.</strong>
-            <p>Ele permanece disponível aqui, mas ainda não há uma exportação de backup registrada.</p>
-          </div>
-          <button class="btn btn-primary" type="button" id="backupReminderExportBtn">Exportar backup</button>
+          Exportar backup
+        </button>
       </section>
       <main id="mainContent">
         <section
@@ -214,12 +258,27 @@
                       Alterar
                     </button>
                   </div>
-                  <aside class="contextual-tip" id="firstReceiptTip" data-contextual-tip="first-receipt" aria-labelledby="firstReceiptTipTitle">
+                  <aside
+                    class="contextual-tip"
+                    id="firstReceiptTip"
+                    data-contextual-tip="first-receipt"
+                    aria-labelledby="firstReceiptTipTitle"
+                  >
                     <div>
                       <strong id="firstReceiptTipTitle">Primeiro recibo</strong>
-                      <p>Preencha locatário, imóvel, valor e competência. A prévia acompanha os dados; o recibo só entra no histórico depois da revisão e da confirmação.</p>
+                      <p>
+                        Preencha locatário, imóvel, valor e competência. A
+                        prévia acompanha os dados; o recibo só entra no
+                        histórico depois da revisão e da confirmação.
+                      </p>
                     </div>
-                    <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="first-receipt">Dispensar dica</button>
+                    <button
+                      class="btn btn-quiet tip-dismiss"
+                      type="button"
+                      data-dismiss-contextual-tip="first-receipt"
+                    >
+                      Dispensar dica
+                    </button>
                   </aside>
                   <details class="form-section" open>
                     <summary>
@@ -421,12 +480,29 @@
                             id="referenceError"
                             role="alert"
                           ></div>
-                          <aside class="contextual-tip contextual-tip-inline" id="competenceTip" data-contextual-tip="competence" aria-labelledby="competenceTipTitle">
+                          <aside
+                            class="contextual-tip contextual-tip-inline"
+                            id="competenceTip"
+                            data-contextual-tip="competence"
+                            aria-labelledby="competenceTipTitle"
+                          >
                             <div>
-                              <strong id="competenceTipTitle">Competência</strong>
-                              <p>É o mês e ano a que o pagamento se refere. Ela aparece no recibo e ajuda a localizar cobranças recorrentes depois.</p>
+                              <strong id="competenceTipTitle"
+                                >Competência</strong
+                              >
+                              <p>
+                                É o mês e ano a que o pagamento se refere. Ela
+                                aparece no recibo e ajuda a localizar cobranças
+                                recorrentes depois.
+                              </p>
                             </div>
-                            <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="competence">Dispensar dica</button>
+                            <button
+                              class="btn btn-quiet tip-dismiss"
+                              type="button"
+                              data-dismiss-contextual-tip="competence"
+                            >
+                              Dispensar dica
+                            </button>
                           </aside>
                         </div>
                         <div class="field">
@@ -710,12 +786,28 @@
                               Timbre e cabeçalho nas demais páginas
                             </option>
                           </select>
-                          <aside class="contextual-tip contextual-tip-inline" id="letterheadTip" data-contextual-tip="letterhead" aria-labelledby="letterheadTipTitle">
+                          <aside
+                            class="contextual-tip contextual-tip-inline"
+                            id="letterheadTip"
+                            data-contextual-tip="letterhead"
+                            aria-labelledby="letterheadTipTitle"
+                          >
                             <div>
                               <strong id="letterheadTipTitle">Timbre</strong>
-                              <p>Escolha onde a identificação institucional aparecerá: sem timbre, só na primeira página ou repetida nas páginas seguintes. A escolha fica registrada no documento emitido.</p>
+                              <p>
+                                Escolha onde a identificação institucional
+                                aparecerá: sem timbre, só na primeira página ou
+                                repetida nas páginas seguintes. A escolha fica
+                                registrada no documento emitido.
+                              </p>
                             </div>
-                            <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="letterhead">Dispensar dica</button>
+                            <button
+                              class="btn btn-quiet tip-dismiss"
+                              type="button"
+                              data-dismiss-contextual-tip="letterhead"
+                            >
+                              Dispensar dica
+                            </button>
                           </aside>
                         </div>
                         <div class="field">
@@ -1701,12 +1793,29 @@
                 Limpar filtros
               </button>
             </div>
-            <aside class="contextual-tip" id="historyRecoveryTip" data-contextual-tip="document-recovery" aria-labelledby="historyRecoveryTipTitle">
+            <aside
+              class="contextual-tip"
+              id="historyRecoveryTip"
+              data-contextual-tip="document-recovery"
+              aria-labelledby="historyRecoveryTipTitle"
+            >
               <div>
-                <strong id="historyRecoveryTipTitle">Recuperar um documento emitido</strong>
-                <p>Abra Ações e escolha Visualizar para carregar o registro salvo para consulta ou reimpressão. Os dados emitidos continuam travados; duplicar cria um novo rascunho.</p>
+                <strong id="historyRecoveryTipTitle"
+                  >Recuperar um documento emitido</strong
+                >
+                <p>
+                  Abra Ações e escolha Visualizar para carregar o registro salvo
+                  para consulta ou reimpressão. Os dados emitidos continuam
+                  travados; duplicar cria um novo rascunho.
+                </p>
               </div>
-              <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="document-recovery">Dispensar dica</button>
+              <button
+                class="btn btn-quiet tip-dismiss"
+                type="button"
+                data-dismiss-contextual-tip="document-recovery"
+              >
+                Dispensar dica
+              </button>
             </aside>
             <div
               class="history-summary"
@@ -2198,7 +2307,13 @@
           A numeração será reservada somente ao emitir e o registro será
           preservado no histórico.
         </div>
-        <p class="modal-error" id="confirmError" role="alert" tabindex="-1" hidden></p>
+        <p
+          class="modal-error"
+          id="confirmError"
+          role="alert"
+          tabindex="-1"
+          hidden
+        ></p>
         <div class="modal-actions">
           <button class="btn btn-secondary" type="button" id="cancelIssueBtn">
             Voltar e revisar</button
@@ -2228,9 +2343,17 @@
           hidden
         ></p>
         <div class="modal-actions">
-          <button class="btn btn-secondary" type="button" id="actionModalCancel">
+          <button
+            class="btn btn-secondary"
+            type="button"
+            id="actionModalCancel"
+          >
             Voltar</button
-          ><button class="btn btn-primary" type="button" id="actionModalConfirm">
+          ><button
+            class="btn btn-primary"
+            type="button"
+            id="actionModalConfirm"
+          >
             Confirmar
           </button>
         </div>
