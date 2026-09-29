@@ -19,8 +19,14 @@
         </div>
         <div class="header-meta">
           <span class="version-chip">VERSÃO 6.8.1</span
-          ><span class="storage-indicator"
-            ><span aria-hidden="true"></span>Dados locais</span
+          ><span
+            class="storage-indicator is-missing"
+            id="storageIndicator"
+            role="status"
+            aria-live="polite"
+            title="Os dados ficam somente neste navegador; não há sincronização."
+            ><span class="storage-indicator-dot" data-storage-dot aria-hidden="true"></span
+            ><span id="storageIndicatorText">Dados neste navegador · sem backup</span></span
           >
         </div>
       </header>
@@ -122,6 +128,19 @@
           </div>
         </nav>
       </div>
+      <section
+          class="backup-reminder"
+          id="backupReminder"
+          aria-labelledby="backupReminderTitle"
+          aria-live="polite"
+          hidden
+        >
+          <div>
+            <strong id="backupReminderTitle">Seu primeiro documento já foi registrado neste navegador.</strong>
+            <p>Ele permanece disponível aqui, mas ainda não há uma exportação de backup registrada.</p>
+          </div>
+          <button class="btn btn-primary" type="button" id="backupReminderExportBtn">Exportar backup</button>
+      </section>
       <main id="mainContent">
         <section
           class="view-panel is-active"
@@ -195,6 +214,13 @@
                       Alterar
                     </button>
                   </div>
+                  <aside class="contextual-tip" id="firstReceiptTip" data-contextual-tip="first-receipt" aria-labelledby="firstReceiptTipTitle">
+                    <div>
+                      <strong id="firstReceiptTipTitle">Primeiro recibo</strong>
+                      <p>Preencha locatário, imóvel, valor e competência. A prévia acompanha os dados; o recibo só entra no histórico depois da revisão e da confirmação.</p>
+                    </div>
+                    <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="first-receipt">Dispensar dica</button>
+                  </aside>
                   <details class="form-section" open>
                     <summary>
                       <span
@@ -395,6 +421,13 @@
                             id="referenceError"
                             role="alert"
                           ></div>
+                          <aside class="contextual-tip contextual-tip-inline" id="competenceTip" data-contextual-tip="competence" aria-labelledby="competenceTipTitle">
+                            <div>
+                              <strong id="competenceTipTitle">Competência</strong>
+                              <p>É o mês e ano a que o pagamento se refere. Ela aparece no recibo e ajuda a localizar cobranças recorrentes depois.</p>
+                            </div>
+                            <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="competence">Dispensar dica</button>
+                          </aside>
                         </div>
                         <div class="field">
                           <label for="payment"
@@ -677,6 +710,13 @@
                               Timbre e cabeçalho nas demais páginas
                             </option>
                           </select>
+                          <aside class="contextual-tip contextual-tip-inline" id="letterheadTip" data-contextual-tip="letterhead" aria-labelledby="letterheadTipTitle">
+                            <div>
+                              <strong id="letterheadTipTitle">Timbre</strong>
+                              <p>Escolha onde a identificação institucional aparecerá: sem timbre, só na primeira página ou repetida nas páginas seguintes. A escolha fica registrada no documento emitido.</p>
+                            </div>
+                            <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="letterhead">Dispensar dica</button>
+                          </aside>
                         </div>
                         <div class="field">
                           <label>Rodapé institucional</label
@@ -1661,6 +1701,13 @@
                 Limpar filtros
               </button>
             </div>
+            <aside class="contextual-tip" id="historyRecoveryTip" data-contextual-tip="document-recovery" aria-labelledby="historyRecoveryTipTitle">
+              <div>
+                <strong id="historyRecoveryTipTitle">Recuperar um documento emitido</strong>
+                <p>Abra Ações e escolha Visualizar para carregar o registro salvo para consulta ou reimpressão. Os dados emitidos continuam travados; duplicar cria um novo rascunho.</p>
+              </div>
+              <button class="btn btn-quiet tip-dismiss" type="button" data-dismiss-contextual-tip="document-recovery">Dispensar dica</button>
+            </aside>
             <div
               class="history-summary"
               id="historySummary"
@@ -2049,9 +2096,9 @@
                 role="status"
                 aria-live="polite"
               >
-                <strong>Situação do backup</strong
+                <strong>Armazenamento e backup</strong
                 ><span id="backupStatusText"
-                  >Verificando o último backup...</span
+                  >Verificando a última exportação...</span
                 >
               </div>
               <div class="backup-actions">
@@ -2110,7 +2157,7 @@
                   <dd id="safetySchemaVersion">8</dd>
                 </div>
                 <div>
-                  <dt>Último backup</dt>
+                  <dt>Última exportação registrada</dt>
                   <dd id="safetyLastBackup">Não registrado</dd>
                 </div>
               </dl>

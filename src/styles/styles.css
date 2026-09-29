@@ -883,6 +883,11 @@ select {
   background: #fff9e9;
   color: #6d5310;
 }
+.safety-card.current {
+  border-color: #b8d9c4;
+  background: #f2fbf5;
+  color: #28603d;
+}
 .safety-card.danger {
   border-color: #e5a9a9;
   background: #fff3f3;
@@ -1267,12 +1272,88 @@ summary:focus-visible,
   font-size: 11.5px;
   font-weight: 700;
 }
-.storage-indicator span {
+.storage-indicator-dot {
   width: 8px;
   height: 8px;
+  flex: 0 0 auto;
   border-radius: 50%;
-  background: #37a05d;
+  background: var(--warning);
+  box-shadow: 0 0 0 3px #f7ecd1;
+}
+.storage-indicator.is-current {
+  color: var(--success);
+}
+.storage-indicator.is-current .storage-indicator-dot {
+  background: var(--success);
   box-shadow: 0 0 0 3px #dff3e6;
+}
+.storage-indicator.is-stale,
+.storage-indicator.is-missing {
+  color: #765515;
+}
+.storage-indicator.is-recovery {
+  color: var(--danger);
+}
+.storage-indicator.is-recovery .storage-indicator-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px #f8dddd;
+}
+.backup-reminder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 0 18px;
+  padding: 15px 18px;
+  border: 1px solid #e6cf8e;
+  border-radius: var(--radius);
+  background: #fff9ea;
+  color: #654d14;
+}
+.backup-reminder strong {
+  display: block;
+  color: inherit;
+  font-size: 14px;
+}
+.backup-reminder p {
+  max-width: 72ch;
+  margin: 3px 0 0;
+  font-size: 12.5px;
+}
+.backup-reminder .btn {
+  flex: 0 0 auto;
+}
+.contextual-tip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 13px 14px;
+  border: 1px solid #aad8e7;
+  border-radius: 12px;
+  background: #effaff;
+  color: #28546a;
+}
+.contextual-tip strong {
+  display: block;
+  color: #1d465a;
+  font-size: 12.5px;
+}
+.contextual-tip p {
+  max-width: 72ch;
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.contextual-tip-inline {
+  margin: 10px 0 0;
+}
+.tip-dismiss {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding-inline: 10px;
+  color: #28546a;
 }
 .app-tabs {
   position: sticky;
@@ -3609,6 +3690,25 @@ summary:focus-visible,
   flex-wrap: wrap;
   gap: 8px;
 }
+.management-backup-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e7cf8a;
+  border-radius: 10px;
+  background: #fff9e9;
+  color: #6d5310;
+}
+.management-backup-notice p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.management-backup-notice .btn {
+  flex: 0 0 auto;
+}
 .governance-actions .btn {
   min-height: 39px;
 }
@@ -3858,6 +3958,13 @@ summary:focus-visible,
   }
   .governance-actions {
     display: grid;
+  }
+  .management-backup-notice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .management-backup-notice .btn {
+    width: 100%;
   }
   .governance-actions .btn {
     width: 100%;
@@ -4128,5 +4235,15 @@ summary:focus-visible,
   }
   .app-tabs .tab-group-items button {
     min-height: 44px;
+  }
+  .backup-reminder,
+  .contextual-tip {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .backup-reminder .btn,
+  .contextual-tip .tip-dismiss {
+    width: 100%;
   }
 }

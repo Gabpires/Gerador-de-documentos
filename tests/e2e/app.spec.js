@@ -183,6 +183,118 @@ test('emite um recibo válido e o mantém no histórico local', async ({ page })
   await expect(page.locator('#historyList')).toContainText('Maria da Silva');
 });
 
+test('oferece backup após a primeira emissão e atualiza o estado ao exportar', async ({ page }) => {
+  await preencherReciboValido(page);
+  await page.locator('#issueBtn').click();
+  await confirmarRevisao(page);
+
+  await expect(page.locator('#backupReminder')).toBeVisible();
+  await expect(page.locator('#storageIndicatorText')).toContainText('sem backup');
+  await expect(page.locator('#backupReminder')).toContainText('não há uma exportação de backup registrada');
+
+  const download = page.waitForEvent('download');
+  await page.locator('#backupReminderExportBtn').click();
+  expect((await download).suggestedFilename()).toMatch(/^backup-documentos-\d{4}-\d{2}-\d{2}\.json$/);
+
+  await expect(page.locator('#backupReminder')).toBeHidden();
+  await expect(page.locator('#storageIndicatorText')).toContainText('backup registrado');
+  await selecionarAba(page, /Backup e segurança/i);
+  await expect(page.locator('#backupStatus')).toHaveClass(/current/);
+  await expect(page.locator('#backupStatusText')).toContainText('Última exportação registrada');
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.meta.lastBackupAt).toBeTruthy();
+});
+
+test('comunica backup ausente, atual e desatualizado na segurança e na gestão', async ({ page }) => {
+  const receipt = { number: '01/2026', year: 2026, amount: 950, tenant: 'Pessoa de Backup', cpf: '52998224725', property: 'Imóvel fictício de backup', contractCode: 'LOC-BACKUP-01', dueDay: 10, reference: '2026-09', payment: 'Pix', receiptDate: '2026-09-25', operator: 'Sandra Marcondes da Silva Alves', status: 'issued', createdAt: '2026-09-25T10:00:00.000Z' };
+  await carregarEstadoGestao(page, estadoGestao({ history: [receipt] }));
+  await expect(page.locator('#storageIndicatorText')).toContainText('sem backup');
+  await selecionarAba(page, /Backup e segurança/i);
+  await expect(page.locator('#backupStatus')).toHaveClass(/warning/);
+  await expect(page.locator('#backupStatusText')).toContainText('Nenhuma exportação de backup foi registrada');
+  await selecionarAba(page, /Gestão/i);
+  await page.locator('#governanceDetails > summary').click();
+  await expect(page.locator('#managementGovernance')).toContainText('Não registrado');
+  await expect(page.getByRole('button', { name: 'Exportar backup agora' })).toBeVisible();
+
+  await carregarEstadoGestao(page, estadoGestao({ history: [receipt], meta: { ...estadoGestao().meta, lastBackupAt: new Date().toISOString() } }));
+  await expect(page.locator('#storageIndicatorText')).toContainText('backup registrado');
+  await selecionarAba(page, /Backup e segurança/i);
+  await expect(page.locator('#backupStatus')).toHaveClass(/current/);
+  await expect(page.locator('#safetyLastBackup')).not.toHaveText('Não registrado');
+
+  await carregarEstadoGestao(page, estadoGestao({ history: [receipt], meta: { ...estadoGestao().meta, lastBackupAt: new Date(Date.now() - 8 * 86400000).toISOString() } }));
+  await expect(page.locator('#storageIndicatorText')).toContainText('backup a renovar');
+  await selecionarAba(page, /Backup e segurança/i);
+  await expect(page.locator('#backupStatus')).toHaveClass(/warning/);
+  await expect(page.locator('#backupStatusText')).toContainText('Exporte uma cópia atualizada');
+  await selecionarAba(page, /Gestão/i);
+  await page.locator('#governanceDetails > summary').click();
+  await expect(page.locator('#managementGovernance')).toContainText('A renovar');
+});
+
+test('mantém a exportação, importação e recuperação dos dados locais', async ({ page }) => {
+  const importedReceipt = { number: '01/2026', year: 2026, amount: 875, tenant: 'Pessoa de Importação', cpf: '52998224725', property: 'Imóvel fictício importado', contractCode: 'LOC-IMPORT-01', dueDay: 8, reference: '2026-09', payment: 'Pix', receiptDate: '2026-09-25', operator: 'Sandra Marcondes da Silva Alves', status: 'issued', createdAt: '2026-09-25T10:00:00.000Z' };
+  const payload = { app: 'Gerador de Documentos - Paraíba Imóveis', version: 11, state: estadoGestao({ history: [importedReceipt] }) };
+
+  await selecionarAba(page, /Backup e segurança/i);
+  await page.locator('#importFile').setInputFiles({ name: 'backup-de-teste.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
+  await expect(page.getByRole('heading', { name: 'Importar este backup?' })).toBeVisible();
+  const safetyCopy = page.waitForEvent('download');
+  await page.locator('#actionModalConfirm').click();
+  expect((await safetyCopy).suggestedFilename()).toMatch(/^backup-antes-importacao-\d{4}-\d{2}-\d{2}\.json$/);
+  await selecionarAba(page, /Histórico/i);
+  await expect(page.locator('#historyList')).toContainText('Pessoa de Importação');
+
+  await page.evaluate((key) => localStorage.setItem(key, '{dados locais inválidos'), storageKey);
+  await page.reload();
+  await selecionarAba(page, /Backup e segurança/i);
+  await expect(page.locator('#recoveryPanel')).toBeVisible();
+  await expect(page.locator('#storageIndicatorText')).toContainText('Dados exigem recuperação');
+  const recovery = page.waitForEvent('download');
+  await page.locator('#downloadRecoveryBtn').click();
+  expect((await recovery).suggestedFilename()).toMatch(/^dados-corrompidos-recibos-\d{4}-\d{2}-\d{2}\.json$/);
+});
+
+test('exibe e persiste a dispensa das dicas contextuais', async ({ page }) => {
+  async function dismissAndVerify(selector, openAfterReload) {
+    await expect(page.locator(selector)).toBeVisible();
+    await page.locator(selector).getByRole('button', { name: 'Dispensar dica' }).click();
+    await expect(page.locator(selector)).toBeHidden();
+    await page.reload();
+    await openAfterReload();
+    await expect(page.locator(selector)).toBeHidden();
+  }
+
+  await selecionarAba(page, /Novo documento/i);
+  await dismissAndVerify('#firstReceiptTip', async () => selecionarAba(page, /Novo documento/i));
+  await dismissAndVerify('#competenceTip', async () => selecionarAba(page, /Novo documento/i));
+
+  await page.getByRole('button', { name: 'Declaração', exact: true }).click();
+  await dismissAndVerify('#letterheadTip', async () => { await selecionarAba(page, /Novo documento/i); await page.getByRole('button', { name: 'Declaração', exact: true }).click(); });
+
+  await selecionarAba(page, /Histórico/i);
+  await dismissAndVerify('#historyRecoveryTip', async () => selecionarAba(page, /Histórico/i));
+
+  await selecionarAba(page, /Dossiês/i);
+  await page.locator('#toggleDossierForm').click();
+  await dismissAndVerify('#dossierCreationTipSlot .contextual-tip', async () => { await selecionarAba(page, /Dossiês/i); await page.locator('#toggleDossierForm').click(); });
+
+  await selecionarAba(page, /Gestão/i);
+  await page.locator('#advancedSearchDetails > summary').click();
+  await dismissAndVerify('#savedViewsTipSlot .contextual-tip', async () => { await selecionarAba(page, /Gestão/i); await page.locator('#advancedSearchDetails > summary').click(); });
+
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.management.settings.dismissedContextualTips).toMatchObject({
+    'first-receipt': true,
+    competence: true,
+    letterhead: true,
+    'document-recovery': true,
+    'dossier-creation': true,
+    'saved-views': true
+  });
+});
+
 test('volta da revisão sem perder dados nem reservar numeração', async ({ page }) => {
   await preencherReciboValido(page);
   await page.locator('#issueBtn').click();

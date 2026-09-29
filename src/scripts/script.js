@@ -7,6 +7,7 @@
   const MAX_AMOUNT = 999999999.99;
   const PAGE_SIZE = 50;
   const BACKUP_WARNING_DAYS = 7;
+  const CONTEXTUAL_TIP_IDS = new Set(['first-receipt', 'document-recovery', 'competence', 'letterhead', 'dossier-creation', 'saved-views']);
   const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   const operadores = ['Sandra Marcondes da Silva Alves', 'Ruziel Aparecido Alves Guilherme'];
   const campos = ['amount', 'tenant', 'cpf', 'property', 'contractCode', 'dueDay', 'reference', 'payment', 'receiptDate', 'operator'];
@@ -400,22 +401,57 @@
     a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1200);
   }
+  function estadoBackup(estado = state) {
+    if (storageCorrupted) return { kind: 'recovery', lastBackupAt: '', days: null, label: 'Dados exigem recuperação', detail: 'As emissões e alterações ficam bloqueadas até a recuperação ser resolvida.' };
+    const lastBackupAt = estado && estado.meta ? estado.meta.lastBackupAt : '';
+    const date = lastBackupAt ? new Date(lastBackupAt) : null;
+    if (!date || Number.isNaN(date.getTime())) return { kind: 'missing', lastBackupAt: '', days: null, label: 'Dados neste navegador · sem backup', detail: 'Nenhuma exportação de backup foi registrada. Os dados ficam somente neste navegador e não são sincronizados.' };
+    const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
+    if (days >= BACKUP_WARNING_DAYS) return { kind: 'stale', lastBackupAt, days, label: 'Dados neste navegador · backup a renovar', detail: 'Última exportação registrada: ' + dataHora(lastBackupAt) + ' (' + days + ' dias). Exporte uma cópia atualizada.' };
+    return { kind: 'current', lastBackupAt, days, label: 'Dados neste navegador · backup registrado', detail: 'Última exportação registrada: ' + dataHora(lastBackupAt) + '. Os dados continuam somente neste navegador; não há sincronização.' };
+  }
+  function temEmissoesRegistradas() { return state.history.length + state.documents.length > 0; }
+  function temRecibosRegistrados() { return state.history.length + state.documents.filter(record => record.type === 'receipt').length > 0; }
+  function atualizarEstadoArmazenamento() {
+    const indicator = $('storageIndicator'), text = $('storageIndicatorText');
+    if (!indicator || !text) return;
+    const backup = estadoBackup();
+    indicator.className = 'storage-indicator is-' + backup.kind;
+    text.textContent = backup.label;
+    indicator.title = backup.kind === 'recovery' ? backup.detail : 'Os dados ficam somente neste navegador; não há sincronização. ' + backup.detail;
+    const reminder = $('backupReminder');
+    if (reminder) reminder.hidden = backup.kind !== 'missing' || !temEmissoesRegistradas();
+  }
+  function dicasDispensadas(estado = state) {
+    const tips = estado && estado.management && estado.management.settings && estado.management.settings.dismissedContextualTips;
+    return tips && typeof tips === 'object' && !Array.isArray(tips) ? tips : {};
+  }
+  function dicaDispensada(id) { return Boolean(dicasDispensadas()[id]); }
+  function atualizarDicasContextuais() {
+    document.querySelectorAll('[data-contextual-tip]').forEach(tip => {
+      const id = tip.dataset.contextualTip;
+      const firstReceipt = id === 'first-receipt';
+      tip.hidden = dicaDispensada(id) || (firstReceipt && temRecibosRegistrados());
+    });
+  }
+  function dispensarDicaContextual(id) {
+    if (!CONTEXTUAL_TIP_IDS.has(id)) return false;
+    state = lerEstado();
+    const management = state.management && typeof state.management === 'object' ? state.management : {};
+    const settings = management.settings && typeof management.settings === 'object' ? management.settings : {};
+    if (!persistir({ ...state, management: { ...management, settings: { ...settings, dismissedContextualTips: { ...dicasDispensadas(state), [id]: true } } } })) return false;
+    atualizarDicasContextuais();
+    document.dispatchEvent(new CustomEvent('app:contextualtipdismissed', { detail: { id } }));
+    return true;
+  }
   function atualizarBackupStatus() {
     const card = $('backupStatus'), texto = $('backupStatusText');
+    if (!card || !texto) return;
     $('recoveryPanel').hidden = !storageCorrupted;
-    if (storageCorrupted) {
-      card.className = 'safety-card danger'; texto.textContent = 'Emissões e alterações estão bloqueadas até a recuperação ser resolvida.'; return;
-    }
-    const ultimo = state && state.meta ? state.meta.lastBackupAt : '';
-    const data = ultimo ? new Date(ultimo) : null;
-    const dias = data && !Number.isNaN(data.getTime()) ? Math.floor((Date.now() - data.getTime()) / 86400000) : Infinity;
-    if (!data || Number.isNaN(data.getTime())) {
-      card.className = 'safety-card warning'; texto.textContent = 'Nenhum backup registrado. Exporte uma cópia antes de iniciar o uso regular.';
-    } else if (dias >= BACKUP_WARNING_DAYS) {
-      card.className = 'safety-card warning'; texto.textContent = 'Último backup: ' + dataHora(ultimo) + ' (' + dias + ' dias). Recomenda-se exportar uma nova cópia.';
-    } else {
-      card.className = 'safety-card'; texto.textContent = 'Último backup: ' + dataHora(ultimo) + '. Situação regular.';
-    }
+    const backup = estadoBackup();
+    card.className = 'safety-card ' + (backup.kind === 'current' ? 'current' : backup.kind === 'recovery' ? 'danger' : 'warning');
+    texto.textContent = backup.detail;
+    atualizarEstadoArmazenamento();
   }
   function baixarDadosRecuperacao() {
     if (!recoveryRaw) return;
@@ -475,6 +511,7 @@
     document.body.classList.toggle('is-issued', !!activeRecord);
     document.body.classList.toggle('is-canceled', status === 'canceled');
     atualizarBackupStatus();
+    atualizarDicasContextuais();
     atualizarVisaoSeguranca();
     ajustarAlturaMobile();
   }
@@ -487,7 +524,7 @@
       const shell = $('documentPageShell'), pages = $('documentPagesPreview'); if (!shell || !pages) return; const firstPage = pages.querySelector('[data-document-preview-page]'), baseWidth = firstPage?.offsetWidth || 794, baseHeight = Math.max(pages.scrollHeight || 1123, 1123), scale = Math.min(1, available / baseWidth); pages.style.setProperty('--document-preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
     }
   }
-  function atualizarVisaoSeguranca() { $('safetyReceiptsCount').textContent = String(state.history.length); $('safetyDocumentsCount').textContent = String(state.documents.length); $('safetyDraftsCount').textContent = String(state.draftDocuments.length + (state.draft ? 1 : 0)); $('safetyTemplatesCount').textContent = String(state.templates.length); $('safetyContactsCount').textContent = String(state.contacts.length); $('safetyClientsCount').textContent = String(state.clients.length); $('safetySchemaVersion').textContent = String(SCHEMA_VERSION); $('safetyLastBackup').textContent = state.meta.lastBackupAt ? dataHora(state.meta.lastBackupAt) : 'Não registrado'; }
+  function atualizarVisaoSeguranca() { const backup = estadoBackup(); $('safetyReceiptsCount').textContent = String(state.history.length); $('safetyDocumentsCount').textContent = String(state.documents.length); $('safetyDraftsCount').textContent = String(state.draftDocuments.length + (state.draft ? 1 : 0)); $('safetyTemplatesCount').textContent = String(state.templates.length); $('safetyContactsCount').textContent = String(state.contacts.length); $('safetyClientsCount').textContent = String(state.clients.length); $('safetySchemaVersion').textContent = String(SCHEMA_VERSION); $('safetyLastBackup').textContent = backup.kind === 'missing' ? 'Não registrado' : backup.kind === 'recovery' ? 'Recuperação necessária' : dataHora(backup.lastBackupAt); }
   function conteudoCabeEmUmaPagina() {
     const limiteA4 = (297 / 25.4) * 96;
     return $('receipt').scrollHeight <= limiteA4 + 4;
@@ -1767,10 +1804,15 @@
     discardDynamicDraft: descartarRascunhoDinamico,
     validateReceipt: data => validarDados(data, { numero: false }),
     notify: toast,
+    exportBackup: exportarBackup,
+    getBackupState: () => estadoBackup(lerEstado()),
+    dismissContextualTip: dispensarDicaContextual,
+    isContextualTipDismissed: id => CONTEXTUAL_TIP_IDS.has(id) && Boolean(dicasDispensadas(lerEstado())[id]),
     legacyTemplates: modelosLegadosParaMigrar,
     markResourceMigration: marcarMigracaoRecursos
   };
   $('backupBtn').addEventListener('click', exportarBackup);
+  $('backupReminderExportBtn').addEventListener('click', exportarBackup);
   $('secureBackupBtn').addEventListener('click', exportarBackupProtegido);
   $('importBtn').addEventListener('click', () => $('importFile').click());
   $('importFile').addEventListener('change', e => { if (e.target.files && e.target.files[0]) importarBackup(e.target.files[0]); });
@@ -1793,6 +1835,8 @@
   $('newContactBtn').addEventListener('click', async () => { await selecionarTipoDocumento('receipt', { ignorarConfirmacao: true }); if (await limpar()) { ativarView('new'); $('tenant').focus(); $('savedTenantStatus').textContent = 'Informe os dados e clique em “Salvar cadastro”.'; } }); $('previewMobileBtn').addEventListener('click', abrirPreview); $('previewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); }); $('genericPreviewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); });
   $('appMenuToggle').addEventListener('click', () => definirMenuApp(!menuAppAberto()));
   document.addEventListener('click', event => {
+    const dismissTip = event.target.closest('[data-dismiss-contextual-tip]');
+    if (dismissTip) { dispensarDicaContextual(dismissTip.dataset.dismissContextualTip); return; }
     const tab = event.target.closest('.app-tabs [role="tab"]');
     if (tab) { ativarView(tab.dataset.view); fecharMenuApp(); return; }
     const toggleGrupo = event.target.closest('.tab-group-toggle');
