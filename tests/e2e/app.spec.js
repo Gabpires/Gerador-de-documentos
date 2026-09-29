@@ -667,6 +667,117 @@ test('cria template HTML, gera formulário dinâmico e congela snapshot na emiss
   expect(frozen.templateSnapshot.renderedHtml).toBe(originalSnapshot);
 });
 
+test('guia pendências do template, mantém rascunho editável e emite somente os campos declarados', async ({ page, isMobile }) => {
+  await selecionarAba(page, /Modelos/i);
+  await page.locator('#newTemplateBtn').click();
+  const suffix = `${isMobile ? 'mobile' : 'desktop'}-${Date.now()}`;
+  const templateId = `revisao-dinamica-${suffix}`;
+  const templateName = 'Contrato dinâmico guiado';
+  await page.locator('#templateId').fill(templateId);
+  await page.locator('#templateName').fill(templateName);
+  await page.locator('#templateKind').selectOption('contract');
+
+  async function configurarCampo(index, { id, name, type, required = false }) {
+    const row = page.locator('#templateFields .template-field-row').nth(index);
+    await row.getByLabel('Identificador').fill(id);
+    await row.getByLabel('Nome do campo').fill(name);
+    await row.getByLabel('Tipo').selectOption(type);
+    if (required) await row.getByLabel('Obrigatório').check();
+  }
+
+  await configurarCampo(0, { id: 'locatario', name: 'Locatário do teste', type: 'text', required: true });
+  await page.locator('#addTemplateField').click();
+  await configurarCampo(1, { id: 'data_assinatura', name: 'Data da assinatura', type: 'date', required: true });
+  await page.locator('#addTemplateField').click();
+  await configurarCampo(2, { id: 'aceite_vistoria', name: 'Aceite da vistoria', type: 'checkbox', required: true });
+  await page.locator('#addTemplateField').click();
+  await configurarCampo(3, { id: 'observacao_livre', name: 'Observação livre', type: 'textarea' });
+  await expect(page.locator('#templateJsonPreview')).toHaveValue(/"required": true/);
+  await expect(page.locator('.template-toolbar')).toHaveAttribute('aria-label', /Contrato dinâmico guiado/);
+  await expect(page.getByText(/Uma tag insere o valor do campo no texto do documento/i)).toBeVisible();
+
+  await page.locator('#templateSourceToggle').click();
+  await page.locator('#templateHtmlSource').fill('<!doctype html><html><body><h1>Contrato guiado</h1><p>{{LOCATARIO_DO_TESTE}}</p><p>{{DATA_DA_ASSINATURA}}</p><p>{{ACEITE_DA_VISTORIA}}</p><p>{{OBSERVACAO_LIVRE}}</p></body></html>');
+  await page.locator('#saveTemplateBtn').click();
+  await expect(page.locator('#templateEngineNotice')).toContainText('salvo em resources/templates');
+
+  const card = page.locator(`.template-resource-card[data-template-id="${templateId}"]`);
+  await card.getByRole('button', { name: 'Usar documento' }).click();
+  await expect(page.locator('#dynamicCompletionStatus')).toContainText('0 de 3 campos obrigatórios preenchidos');
+  await expect(page.locator('#dynamicCompletionStatus')).toContainText('Locatário do teste');
+  await expect(page.locator('#dynamicPendingList')).toContainText('Aceite da vistoria');
+
+  await page.locator('#saveDynamicDraftBtn').click();
+  await expect(page.locator('#dynamicDraftState')).toContainText('Rascunho salvo');
+  await expect(page.getByRole('button', { name: 'Atualizar rascunho' })).toBeVisible();
+  let persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.draftDocuments).toHaveLength(1);
+  expect(persisted.draftDocuments[0].number).toBe('');
+  expect(persisted.documentCounters).toEqual({});
+  await page.locator('#discardDynamicDraftBtn').click();
+  await expect(page.locator('#actionModal')).toBeVisible();
+  await page.locator('#actionModalConfirm').click();
+  await expect(page.locator('#dynamicDraftState')).toContainText('Nenhum rascunho salvo');
+  persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.draftDocuments).toHaveLength(0);
+  expect(persisted.documentCounters).toEqual({});
+  await page.locator('#saveDynamicDraftBtn').click();
+
+  await page.reload();
+  await selecionarAba(page, /Histórico/i);
+  const draftRow = page.locator('.history-item').filter({ hasText: templateName });
+  await draftRow.locator('summary').click();
+  await draftRow.getByRole('button', { name: 'Editar rascunho' }).click();
+  await expect(page.locator('#dynamic-locatario')).toHaveValue('');
+
+  await page.getByRole('button', { name: 'Emitir e numerar' }).click();
+  await expect(page.locator('#dynamicValidationSummary')).toContainText('Locatário do teste');
+  await expect(page.locator('#confirmModal')).toBeHidden();
+  persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.documents).toHaveLength(0);
+  expect(persisted.documentCounters).toEqual({});
+
+  await page.locator('#dynamicPendingList').getByRole('button', { name: 'Locatário do teste' }).click();
+  await expect(page.locator('#dynamic-locatario')).toBeFocused();
+  await page.locator('#dynamic-locatario').fill('Pessoa de teste');
+  await expect(page.locator('#dynamicCompletionStatus')).toContainText('1 de 3 campos obrigatórios preenchidos');
+  await expect(page.locator('#dynamicCompletionStatus')).toContainText('Data da assinatura');
+  await page.getByRole('button', { name: 'Emitir e numerar' }).click();
+  await expect(page.locator('#dynamicValidationSummary')).toContainText('Data da assinatura');
+
+  await page.locator('#dynamic-data_assinatura').fill('2026-09-29');
+  await expect(page.locator('#dynamicCompletionStatus')).toContainText('2 de 3 campos obrigatórios preenchidos');
+  await page.getByRole('button', { name: 'Emitir e numerar' }).click();
+  await expect(page.locator('#dynamicValidationSummary')).toContainText('Aceite da vistoria');
+  await page.locator('#dynamicPendingList').getByRole('button', { name: 'Aceite da vistoria' }).click();
+  await expect(page.locator('#dynamic-aceite_vistoria')).toBeFocused();
+  await page.locator('#dynamic-aceite_vistoria').check();
+  await expect(page.locator('#dynamicCompletionStatus')).toContainText('3 de 3 campos obrigatórios preenchidos');
+
+  await page.getByRole('button', { name: 'Emitir e numerar' }).click();
+  await expect(page.getByRole('heading', { name: 'Revisar emissão de contrato' })).toBeVisible();
+  await confirmarRevisao(page);
+  await expect(page.locator('#templateEngineNotice')).toContainText(/emitido.*congelado/);
+  persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  const issued = persisted.documents.find(record => record.dynamic && record.templateId === templateId);
+  expect(issued.number).toMatch(/^CONT-\d{3}\/2026$/);
+  expect(persisted.draftDocuments).toHaveLength(0);
+  expect(issued.templateSnapshot.definition.fields.map(field => field.required)).toEqual([true, true, true, false]);
+  expect(issued.templateSnapshot.renderedHtml).toContain('Pessoa de teste');
+  const frozenHtml = issued.templateSnapshot.renderedHtml;
+
+  await page.reload();
+  persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.documents.find(record => record.id === issued.id).templateSnapshot.renderedHtml).toBe(frozenHtml);
+  await selecionarAba(page, /Modelos/i);
+  await page.locator(`.template-resource-card[data-template-id="${templateId}"]`).getByRole('button', { name: 'Editar' }).click();
+  await page.locator('#templateSourceToggle').click();
+  await page.locator('#templateHtmlSource').fill('<!doctype html><html><body><h1>Contrato alterado depois da emissão</h1></body></html>');
+  await page.locator('#saveTemplateBtn').click();
+  persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.documents.find(record => record.id === issued.id).templateSnapshot.renderedHtml).toBe(frozenHtml);
+});
+
 test('mantém o foco contido no modal, fecha com Escape e devolve o foco sem perder o rascunho', async ({ page }) => {
   await preencherReciboValido(page);
   const trigger = page.locator('#issueBtn');

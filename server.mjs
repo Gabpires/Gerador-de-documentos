@@ -53,6 +53,7 @@ function validateDefinition(source, routeId) {
     if (fieldName.length < 2) throw new Error(`Campo ${index + 1}: informe o nome.`);
     if (!/^\{\{[A-Z][A-Z0-9_]{1,63}\}\}$/.test(tag) || tags.has(tag)) throw new Error(`Campo ${index + 1}: tag inválida ou repetida.`);
     if (!fieldTypes.has(type) || !validations.has(validation)) throw new Error(`Campo ${index + 1}: tipo ou validação inválidos.`);
+    if (item.required !== undefined && typeof item.required !== 'boolean') throw new Error(`Campo ${index + 1}: obrigatório deve ser verdadeiro ou falso.`);
     const options = type === 'select' ? (Array.isArray(item.options) ? item.options : []).map(option => ({ label: plain(option && option.label, 120), value: plain(option && option.value, 120) })).filter(option => option.label && option.value) : [];
     if (type === 'select' && (!options.length || options.length > 100 || new Set(options.map(option => option.value)).size !== options.length)) throw new Error(`Campo ${index + 1}: informe opções únicas para o combobox.`);
     ids.add(fieldId); tags.add(tag);

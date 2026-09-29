@@ -3172,8 +3172,21 @@ summary:focus-visible,
 .template-field-options textarea { width: 100%; min-height: 36px; border: 1px solid var(--border); border-radius: 7px; padding: 7px; font: inherit; }
 .template-field-options { grid-column: 1/-1; }
 .template-field-options textarea { min-height: 58px; resize: vertical; }
+.template-field-guidance {
+  grid-column: 1/-1;
+  margin: 0;
+  color: #56616d;
+  font-size: 11px;
+  line-height: 1.45;
+}
 .template-editor-panel #templateJsonPreview { width: 100%; min-height: 175px; resize: vertical; box-sizing: border-box; }
 .template-field-check { align-self: end; display: flex; gap: 7px; align-items: center; min-height: 36px; color: #374151; font-size: 12px; font-weight: 700; }
+.template-tag-hint {
+  margin: 10px 0 8px;
+  color: #56616d;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .template-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
 .template-toolbar select { min-height: 34px; min-width: 160px; border: 1px solid var(--border); border-radius: 7px; padding: 0 7px; }
 .template-visual-editor,
@@ -3228,9 +3241,28 @@ summary:focus-visible,
   cursor: pointer;
 }
 .dynamic-validation-summary button:focus-visible { outline: 3px solid rgba(183, 13, 24, 0.22); outline-offset: 3px; }
+.dynamic-review {
+  padding: 14px;
+  border: 1px solid #b9dce8;
+  border-radius: 10px;
+  background: #f4fbfd;
+  color: #29353f;
+}
+.dynamic-review h3,
+.dynamic-review h4 { margin: 0; }
+.dynamic-review h3 { font-size: 14px; }
+.dynamic-review h4 { margin-top: 12px; color: #41505d; font-size: 11px; text-transform: uppercase; }
+.dynamic-review > p { margin: 7px 0 0; color: #374956; font-size: 12px; font-weight: 700; line-height: 1.45; }
+.dynamic-pending-list { display: grid; gap: 7px; margin: 9px 0 0; padding: 0; list-style: none; }
+.dynamic-pending-list li { display: grid; gap: 2px; padding: 8px 9px; border: 1px solid #d3e7ee; border-radius: 8px; background: #fff; font-size: 12px; }
+.dynamic-pending-list button { justify-self: start; border: 0; border-bottom: 1px solid currentColor; padding: 0; background: transparent; color: #155a73; font: inherit; font-weight: 800; cursor: pointer; }
+.dynamic-pending-list button:focus-visible { outline: 3px solid rgba(21, 90, 115, .24); outline-offset: 3px; }
+.dynamic-pending-list span { color: #56616d; }
+.dynamic-pending-list .dynamic-review-clear { margin: 0; color: #25633b; font-size: 12px; font-weight: 700; }
 .dynamic-field { gap: 5px; }
 .dynamic-field small { color: var(--muted); font-size: 11px; }
 .dynamic-document-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 8px; }
+.dynamic-draft-state { margin: 5px 0 0; color: #155a73; font-size: 12px; line-height: 1.45; }
 .dynamic-print-frame { position: fixed; width: 0; height: 0; border: 0; opacity: 0; pointer-events: none; }
 
 @media (max-width: 900px) {

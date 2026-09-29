@@ -7,6 +7,32 @@ const definition = () => ({ id: 'teste-modelo', name: 'Modelo de teste', documen
 test('aceita definição dinâmica válida', () => {
   assert.equal(validateDefinition(definition(), 'teste-modelo').fields[0].tag, '{{CLIENTE}}');
 });
+test('preserva obrigatoriedade e validações declarativas dos campos', () => {
+  const valid = definition();
+  valid.fields = [
+    { id: 'parte', name: 'Parte contratante', tag: '{{PARTE_CONTRATANTE}}', type: 'text', required: true, defaultValue: '', helpText: '', validation: 'cpfCnpj', options: [] },
+    { id: 'assinatura', name: 'Data da assinatura', tag: '{{DATA_ASSINATURA}}', type: 'date', required: true, defaultValue: '', helpText: '', validation: 'date', options: [] },
+    { id: 'aceite', name: 'Aceite', tag: '{{ACEITE}}', type: 'checkbox', required: true, defaultValue: false, helpText: '', validation: 'none', options: [] },
+    { id: 'observacao', name: 'Observação', tag: '{{OBSERVACAO}}', type: 'textarea', required: false, defaultValue: '', helpText: '', validation: 'none', options: [] }
+  ];
+  const normalized = validateDefinition(valid, 'teste-modelo');
+  assert.deepEqual(normalized.fields.map(field => [field.type, field.required, field.validation]), [
+    ['text', true, 'cpfCnpj'],
+    ['date', true, 'date'],
+    ['checkbox', true, 'none'],
+    ['textarea', false, 'none']
+  ]);
+});
+test('rejeita obrigatoriedade, tipo, tag e validação inválidos', () => {
+  const invalidRequired = definition(); invalidRequired.fields[0].required = 'sim';
+  assert.throws(() => validateDefinition(invalidRequired, 'teste-modelo'), /obrigatório/i);
+  const invalidType = definition(); invalidType.fields[0].type = 'email';
+  assert.throws(() => validateDefinition(invalidType, 'teste-modelo'), /tipo/i);
+  const invalidTag = definition(); invalidTag.fields[0].tag = '{{cliente}}';
+  assert.throws(() => validateDefinition(invalidTag, 'teste-modelo'), /tag/i);
+  const invalidValidation = definition(); invalidValidation.fields[0].validation = 'email';
+  assert.throws(() => validateDefinition(invalidValidation, 'teste-modelo'), /validação/i);
+});
 test('rejeita tags duplicadas e caminhos inválidos', () => {
   const invalid = definition(); invalid.id = '../fora';
   assert.throws(() => validateDefinition(invalid, '../fora'));
