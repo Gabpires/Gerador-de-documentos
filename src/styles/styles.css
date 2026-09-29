@@ -1160,7 +1160,7 @@ select {
   --border: #dde2e8;
   --border-strong: #c9d0d8;
   --text: #20242b;
-  --muted: #68717d;
+  --muted: #5f6874;
   --success: #237a43;
   --warning: #8a6116;
   --danger: #b42318;
@@ -4233,5 +4233,250 @@ summary:focus-visible,
   .backup-reminder .btn,
   .contextual-tip .tip-dismiss {
     width: 100%;
+  }
+}
+
+/* Fase 5: legibilidade e eficiência da interface operacional.
+   A tipografia compacta e o texto justificado em pt/mm permanecem restritos à
+   folha A4 (.receipt e .document-preview), onde fazem parte da composição impressa. */
+.keyboard-shortcuts {
+  display: none;
+}
+
+@media screen {
+  .keyboard-shortcuts {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin: -8px 3px 14px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .keyboard-shortcuts > span:first-child {
+    color: var(--text);
+    font-weight: 800;
+  }
+  .keyboard-shortcuts kbd {
+    min-width: 22px;
+    padding: 2px 5px;
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: var(--surface);
+    color: #3d4651;
+    font: 800 12px/1.2 Inter, 'Segoe UI', Arial, sans-serif;
+    text-align: center;
+  }
+  .keyboard-shortcuts-note {
+    color: #52606d;
+  }
+
+  .version-chip,
+  .storage-indicator,
+  .eyebrow,
+  .number-box span,
+  .form-section > summary small,
+  .field .hint,
+  .optional,
+  .issue-summary span,
+  .issue-summary strong,
+  .status-note,
+  .field-error,
+  .filter-field > span,
+  .history-summary,
+  .contacts-summary,
+  .history-table-head,
+  .history-item,
+  .history-person span,
+  .history-item .history-date,
+  .history-pager,
+  .history-menu-list button,
+  .status-badge,
+  .history-type-label,
+  .contact-card .document,
+  .contact-property,
+  .contact-meta,
+  .contact-actions button,
+  .safety-card,
+  .safety-overview dt,
+  .local-mode,
+  .privacy-note,
+  .action-modal-fields .field-help,
+  .preview-mobile-btn,
+  .preview-close,
+  .tab-group-label,
+  #managementBatchAction .btn,
+  .management-kpi span,
+  .management-kpi small,
+  .management-kpis .management-kpi span,
+  .management-kpis .management-kpi small,
+  .management-disclosure > summary small,
+  .management-disclosure-meta,
+  .document-type-picker > span,
+  .document-type-options button,
+  .check-row,
+  .generic-status,
+  .document-warning,
+  .template-card p,
+  .template-field-control,
+  .template-field-options,
+  .template-field-guidance,
+  .dynamic-review h4,
+  .dynamic-field small,
+  .section-heading p,
+  .management-row,
+  .management-row button,
+  .management-empty,
+  .batch-dossiers .check-row,
+  .management-backup-notice p,
+  .dossier-card span,
+  .dossier-card small,
+  .dossier-detail-head p,
+  .dossier-meta dt,
+  .dossier-meta dd,
+  .dossier-checklist .inline-check,
+  .attachment-tools input,
+  .timeline-item,
+  .model-governance p,
+  .app-tabs button {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .field .hint,
+  .optional,
+  .history-summary,
+  .contacts-summary,
+  .history-table-head,
+  .history-person span,
+  .history-item .history-date,
+  .history-pager,
+  .contact-card .document,
+  .contact-property,
+  .contact-meta,
+  .safety-overview dt,
+  .action-modal-fields .field-help,
+  .management-kpi span,
+  .management-kpi small,
+  .management-kpis .management-kpi span,
+  .management-kpis .management-kpi small,
+  .management-disclosure > summary small,
+  .section-heading p,
+  .management-empty,
+  .dossier-card span,
+  .dossier-card small,
+  .dossier-detail-head p,
+  .dossier-meta dt,
+  .dossier-meta dd,
+  .model-governance p {
+    color: var(--muted);
+  }
+  ::placeholder {
+    color: #68717d;
+    opacity: 1;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible,
+  [role='button']:focus-visible,
+  [role='tab']:focus-visible,
+  [contenteditable='true']:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid var(--brand-dark);
+    outline-offset: 3px;
+    box-shadow: none;
+  }
+  .workspace:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .btn:disabled,
+  .mini:disabled,
+  .link-btn:disabled,
+  .document-type-options button:disabled,
+  .history-menu-list button:disabled {
+    border-color: var(--border-strong);
+    background: #eef1f4;
+    color: var(--muted);
+    opacity: 1;
+  }
+
+  .btn,
+  .mini,
+  .link-btn,
+  .app-menu-toggle,
+  .app-tabs button,
+  .app-tabs .tab-group-toggle,
+  .app-tabs .tab-group-items button,
+  .preview-mobile-btn,
+  .preview-close,
+  .document-type-options button,
+  .history-menu > summary,
+  .history-menu-list button,
+  .history-pager button,
+  .contact-actions button,
+  .template-section-title button,
+  .template-toolbar button,
+  .template-field-actions button,
+  .management-row button,
+  .governance-actions .btn,
+  .dossier-detail-head .btn,
+  #managementBatchAction .btn,
+  .template-toolbar select,
+  .template-field-control input,
+  .template-field-control select,
+  .template-field-options textarea,
+  .saved-view-row select,
+  .model-governance select,
+  .management-link-field select,
+  .management-row.is-interactive,
+  .dossier-card,
+  .check-row,
+  .dossier-checklist .inline-check {
+    min-height: 44px;
+  }
+
+  .content-card > .client-form,
+  .content-card > .dossier-form {
+    padding: 18px 0;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .content-card > .model-governance {
+    padding: 18px 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@media screen and (max-width: 1100px) {
+  .keyboard-shortcuts {
+    justify-content: flex-start;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .keyboard-shortcuts {
+    display: none;
+  }
+  .form-wrap {
+    padding-bottom: calc(var(--mobile-action-bar-height, 132px) + 24px + env(safe-area-inset-bottom));
+  }
+  html {
+    scroll-padding-bottom: calc(var(--mobile-action-bar-height, 132px) + 24px + env(safe-area-inset-bottom));
   }
 }

@@ -633,6 +633,145 @@ test('mantém os controles essenciais visíveis sem rolagem horizontal', async (
   expect(pageWidth.scroll).toBeLessThanOrEqual(pageWidth.client);
 });
 
+test('mantém a interface operacional legível e sem rolagem horizontal nas larguras de referência', async ({ page }) => {
+  for (const width of [1280, 900, 767, 380]) {
+    await page.setViewportSize({ width, height: 844 });
+    await selecionarAba(page, /Novo documento/i);
+
+    const layout = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth
+    }));
+    expect(layout.scrollWidth, `rolagem horizontal em ${width}px`).toBeLessThanOrEqual(layout.clientWidth);
+
+    const samples = await page.locator([
+      '.version-chip',
+      '.storage-indicator',
+      '.field .hint',
+      '.optional',
+      '.form-section > summary small',
+      '.issue-summary span',
+      '.status-note'
+    ].join(',')).evaluateAll(elements => elements.filter(element => element.getClientRects().length).map(element => ({
+      selector: element.className,
+      fontSize: Number.parseFloat(getComputedStyle(element).fontSize)
+    })));
+    expect(samples.length).toBeGreaterThan(0);
+    expect(samples.every(sample => sample.fontSize >= 12), JSON.stringify(samples)).toBe(true);
+  }
+});
+
+test('mantém contraste AA nos textos auxiliares e estados operacionais', async ({ page }) => {
+  await selecionarAba(page, /Novo documento/i);
+  const results = await page.locator([
+    '.version-chip',
+    '.storage-indicator',
+    '.contextual-tip p',
+    '.field .hint',
+    '.optional',
+    '.issue-summary span',
+    '.status-note'
+  ].join(',')).evaluateAll(elements => {
+    const parse = value => {
+      const channels = value.match(/[\d.]+/g)?.map(Number) || [];
+      return { rgb: channels.slice(0, 3), alpha: channels[3] ?? 1 };
+    };
+    const background = element => {
+      const layers = [];
+      for (let node = element; node; node = node.parentElement) layers.push(parse(getComputedStyle(node).backgroundColor));
+      let result = [255, 255, 255];
+      for (const layer of layers.reverse()) {
+        if (!layer.rgb.length || layer.alpha === 0) continue;
+        result = layer.rgb.map((channel, index) => channel * layer.alpha + result[index] * (1 - layer.alpha));
+      }
+      return result;
+    };
+    const luminance = rgb => {
+      const channels = rgb.map(channel => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    };
+    return elements.filter(element => element.getClientRects().length).map(element => {
+      const foreground = parse(getComputedStyle(element).color).rgb;
+      const foreLum = luminance(foreground);
+      const backLum = luminance(background(element));
+      return {
+        text: element.textContent.trim().slice(0, 40),
+        ratio: (Math.max(foreLum, backLum) + 0.05) / (Math.min(foreLum, backLum) + 0.05)
+      };
+    });
+  });
+  expect(results.length).toBeGreaterThan(0);
+  expect(results.every(result => result.ratio >= 4.5), JSON.stringify(results)).toBe(true);
+});
+
+test('oferece controles primários com área de toque e foco visível de pelo menos 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 380, height: 844 });
+  await selecionarAba(page, /Novo documento/i);
+
+  const controls = page.locator('#appMenuToggle, #previewMobileBtn, #clearBtn, #saveDraftBtn, #issueBtn');
+  await expect(controls).toHaveCount(5);
+  for (const control of await controls.all()) {
+    const box = await control.boundingBox();
+    expect(box?.height || 0).toBeGreaterThanOrEqual(44);
+  }
+
+  await page.locator('#previewMobileBtn').focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#previewMobileBtn')).toBeFocused();
+  const focus = await page.locator('#previewMobileBtn').evaluate(element => {
+    const style = getComputedStyle(element);
+    return { outlineStyle: style.outlineStyle, outlineWidth: Number.parseFloat(style.outlineWidth) };
+  });
+  expect(focus.outlineStyle).not.toBe('none');
+  expect(focus.outlineWidth).toBeGreaterThanOrEqual(3);
+});
+
+test('documenta atalhos seguros e os desativa durante a digitação', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 844 });
+  const shortcuts = page.getByRole('note', { name: 'Atalhos de teclado' });
+  await expect(shortcuts).toContainText('Alt+N');
+  await expect(shortcuts).toContainText('Alt+H');
+  await expect(shortcuts).toContainText('Alt+P');
+  await expect(page.locator('#tab-new')).toHaveAttribute('aria-keyshortcuts', 'Alt+N');
+  await expect(page.locator('#tab-history')).toHaveAttribute('aria-keyshortcuts', 'Alt+H');
+  await expect(page.locator('#previewMobileBtn')).toHaveAttribute('aria-keyshortcuts', 'Alt+P');
+
+  await page.keyboard.press('Alt+H');
+  await expect(page.locator('#view-history')).toBeVisible();
+  await page.keyboard.press('Alt+N');
+  await expect(page.locator('#view-new')).toBeVisible();
+  await page.keyboard.press('Alt+P');
+  await expect(page.locator('.workspace')).toBeFocused();
+
+  await page.locator('#tenant').fill('Texto preservado');
+  await page.keyboard.press('Alt+H');
+  await expect(page.locator('#view-new')).toBeVisible();
+  await expect(page.locator('#tenant')).toHaveValue('Texto preservado');
+
+  const persisted = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), storageKey);
+  expect(persisted.history).toEqual([]);
+  expect(persisted.documents).toEqual([]);
+});
+
+test('mantém o último controle editável acima da barra de ações móvel', async ({ page }) => {
+  await page.setViewportSize({ width: 380, height: 844 });
+  await selecionarAba(page, /Novo documento/i);
+  await page.locator('.form-section').last().evaluate(element => { element.open = true; });
+  const lastEditable = page.locator('#operator');
+  await lastEditable.scrollIntoViewIfNeeded();
+
+  const geometry = await page.evaluate(() => {
+    const field = document.querySelector('#operator').getBoundingClientRect();
+    const actions = [...document.querySelectorAll('.actions')].find(element => element.getClientRects().length)?.getBoundingClientRect();
+    return { fieldBottom: field.bottom, actionsTop: actions?.top || innerHeight };
+  });
+  expect(geometry.fieldBottom).toBeLessThanOrEqual(geometry.actionsTop);
+});
+
 test('cria um dossiê local e o preserva no mesmo armazenamento da aplicação', async ({ page }) => {
   await selecionarAba(page, /Dossiês/i);
   await page.getByRole('button', { name: 'Novo dossiê' }).click();

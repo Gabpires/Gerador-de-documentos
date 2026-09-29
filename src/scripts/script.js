@@ -518,6 +518,9 @@
   function ajustarAlturaMobile() {
     const workspace = document.querySelector('.workspace'); if (!workspace) return;
     const mobile = window.matchMedia('(max-width:767px)').matches, available = mobile ? Math.max(280, window.innerWidth - 20) : Math.max(280, workspace.clientWidth - 36);
+    const actionBar = [...document.querySelectorAll('.actions')].find(element => element.getClientRects().length);
+    const actionBarHeight = mobile && actionBar ? Math.ceil(actionBar.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty('--mobile-action-bar-height', actionBarHeight + 'px');
     if (currentDocumentType === 'receipt') {
       const shell = document.querySelector('.page-shell'), receipt = $('receipt'); if (!shell || !receipt) return; const baseWidth = receipt.offsetWidth || 794, baseHeight = receipt.offsetHeight || 1123, scale = Math.min(1, available / baseWidth); receipt.style.setProperty('--preview-scale', String(scale)); shell.style.width = Math.ceil(baseWidth * scale) + 'px'; shell.style.height = Math.ceil(baseHeight * scale) + 'px';
     } else {
@@ -563,6 +566,19 @@
   }
   function abrirPreview() { document.body.classList.add('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'true'); setTimeout(() => { ajustarAlturaMobile(); $(currentDocumentType === 'receipt' ? 'previewCloseBtn' : 'genericPreviewCloseBtn').focus(); }, 0); }
   function fecharPreview() { const aberta = document.body.classList.contains('preview-open'); document.body.classList.remove('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'false'); if (aberta) setTimeout(ajustarAlturaMobile, 0); }
+  function focoEmEntradaDeDados(elemento) {
+    return elemento instanceof Element && Boolean(elemento.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'));
+  }
+  function focarPreviewPorAtalho() {
+    const workspace = document.querySelector('.workspace');
+    if (!workspace) return;
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      abrirPreview();
+      return;
+    }
+    workspace.focus({ preventScroll: true });
+    workspace.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
   function idContato(c) {
     const base = String(c.cpf || '').replace(/\D/g, '') + '|' + normalizarTexto(c.property);
     let h = 2166136261;
@@ -1878,6 +1894,19 @@
     else if (event.key === 'End') destination = tabs.length - 1;
     if (destination >= 0) { event.preventDefault(); ativarView(tabs[destination].dataset.view, { focar: true }); }
   });
+  document.addEventListener('keydown', event => {
+    if (event.defaultPrevented || event.repeat || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (focoEmEntradaDeDados(event.target) || focoEmEntradaDeDados(document.activeElement) || modalSuperior()) return;
+    const key = event.key.toLowerCase();
+    if (!['n', 'h', 'p'].includes(key)) return;
+    event.preventDefault();
+    if (key === 'n') ativarView('new');
+    else if (key === 'h') ativarView('history');
+    else {
+      if (currentView !== 'new') ativarView('new');
+      requestAnimationFrame(focarPreviewPorAtalho);
+    }
+  });
   document.addEventListener('keydown', e => {
     manterFocoNoModal(e);
     if (e.key !== 'Escape') return;
@@ -1901,7 +1930,7 @@
     if (!activeRecord && !draftDirty && state.draft) restaurarRascunho();
     renderCadastros(); renderGerenciadorClientes(); renderHistorico(); renderModelos(); atualizarClientesContrato(); atualizar(); if (currentDocumentType !== 'receipt') { atualizarCadastrosDocumento(); atualizarOpcoesModelos(); atualizarDocumentoGenerico(); }
   });
-  if ('ResizeObserver' in window) { const previewObserver = new ResizeObserver(ajustarAlturaMobile); previewObserver.observe($('receipt')); previewObserver.observe($('documentPreview')); previewObserver.observe(document.querySelector('.workspace')); }
+  if ('ResizeObserver' in window) { const previewObserver = new ResizeObserver(ajustarAlturaMobile); previewObserver.observe($('receipt')); previewObserver.observe($('documentPreview')); previewObserver.observe(document.querySelector('.workspace')); document.querySelectorAll('.actions').forEach(actions => previewObserver.observe(actions)); }
   $('receiptDate').value = hoje();
   $('reference').value = mesAtual();
   $('payment').value = 'Dinheiro';

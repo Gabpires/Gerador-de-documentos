@@ -125,6 +125,10 @@ A paleta é predominantemente neutra, com cor aplicada para prioridade, orienta�
 
 **The Label-First Rule.** Nenhum campo depende de placeholder, cor ou posição para explicar seu propósito; o rótulo nomeia o dado antes da entrada.
 
+### Exceção documental A4
+
+A folha A4 preserva os tamanhos em `pt/mm` e o texto justificado definidos para recibos, declarações, termos e contratos. Essa exceção é exclusiva da prévia e da impressão: chips, metadados, avisos, rótulos e textos auxiliares da interface operacional usam no mínimo 12px, contraste AA e alinhamento natural de leitura em tela.
+
 ## Layout
 
 No desktop, a área de emissão trabalha em duas colunas: formulário de largura controlada e prévia A4 persistente. Cabeçalho e navegação ficam acessíveis enquanto o operador percorre um formulário longo; cartões de conteúdo sustentam as áreas de histórico, cadastros, modelos e segurança.

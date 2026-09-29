@@ -69,6 +69,7 @@
                 id="tab-new"
                 aria-controls="view-new"
                 aria-selected="true"
+                aria-keyshortcuts="Alt+N"
                 data-view="new"
               >
                 Novo documento
@@ -96,6 +97,7 @@
                 id="tab-history"
                 aria-controls="view-history"
                 aria-selected="false"
+                aria-keyshortcuts="Alt+H"
                 data-view="history"
               >
                 Histórico
@@ -161,6 +163,17 @@
           </div>
         </nav>
       </div>
+      <aside
+        class="keyboard-shortcuts"
+        role="note"
+        aria-label="Atalhos de teclado"
+      >
+        <span>Atalhos:</span>
+        <span><kbd>Alt</kbd>+<kbd>N</kbd> emissão</span>
+        <span><kbd>Alt</kbd>+<kbd>H</kbd> histórico</span>
+        <span><kbd>Alt</kbd>+<kbd>P</kbd> prévia</span>
+        <span class="keyboard-shortcuts-note">Pausados durante a digitação.</span>
+      </aside>
       <section
         class="backup-reminder"
         id="backupReminder"
@@ -209,6 +222,7 @@
                   id="previewMobileBtn"
                   aria-controls="receipt documentPreview"
                   aria-expanded="false"
+                  aria-keyshortcuts="Alt+P"
                 >
                   Visualizar documento
                 </button>
@@ -1517,7 +1531,12 @@
                 </div>
               </div>
             </aside>
-            <main class="workspace" aria-label="Prévia do documento">
+            <main
+              class="workspace"
+              aria-label="Prévia do documento"
+              aria-keyshortcuts="Alt+P"
+              tabindex="-1"
+            >
               <div id="receiptPreviewArea">
                 <div class="preview-toolbar">
                   <div>
