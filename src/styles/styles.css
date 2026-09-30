@@ -4492,3 +4492,99 @@ summary:focus-visible,
     scroll-padding-bottom: calc(var(--mobile-action-bar-height, 132px) + 24px + env(safe-area-inset-bottom));
   }
 }
+
+/* Fase 3: reflow e alvos de toque da interface operacional.
+   A geometria em mm/pt e o recorte das folhas A4 permanecem inalterados. */
+@media screen {
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  .management-kpis .management-kpi strong,
+  .management-row strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .management-row strong {
+    flex: 1 1 12rem;
+    min-width: min(100%, 14rem);
+  }
+  .management-row > span {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .management-row {
+    flex-wrap: wrap;
+  }
+
+  .filter-field input,
+  .filter-field select,
+  .template-field-control input,
+  .template-field-control select,
+  .template-field-options textarea,
+  .template-toolbar select,
+  .saved-view-row select,
+  .model-governance select,
+  .management-link-field select {
+    min-height: 44px;
+  }
+
+  .template-toolbar button,
+  .template-field-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .check-row,
+  .inline-check,
+  .dossier-checklist .inline-check {
+    min-height: 44px;
+    cursor: pointer;
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .management-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .management-row strong,
+  .management-row > span {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .actions {
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+  }
+
+  #view-new :is(input, select, textarea, button, summary, .field-error, .generic-status, .document-warning) {
+    scroll-margin-bottom: calc(var(--mobile-action-bar-height, 132px) + 32px + env(safe-area-inset-bottom));
+  }
+
+  body.preview-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  .preview-open .workspace {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: max(10px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+    overscroll-behavior: contain;
+  }
+}

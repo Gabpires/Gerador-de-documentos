@@ -591,7 +591,7 @@
     document.body.classList.add('preview-open');
     $('previewMobileBtn').setAttribute('aria-expanded', 'true');
     if (currentDocumentType !== 'receipt') finalizarPaginacaoDocumento();
-    setTimeout(() => { ajustarAlturaMobile({ force: true }); $(currentDocumentType === 'receipt' ? 'previewCloseBtn' : 'genericPreviewCloseBtn').focus(); }, 0);
+    setTimeout(() => { ajustarAlturaMobile({ force: true }); $(currentDocumentType === 'receipt' ? 'previewCloseBtn' : 'genericPreviewCloseBtn').focus({ preventScroll: true }); }, 0);
   }
   function fecharPreview() { const aberta = document.body.classList.contains('preview-open'); document.body.classList.remove('preview-open'); $('previewMobileBtn').setAttribute('aria-expanded', 'false'); if (aberta) setTimeout(ajustarAlturaMobile, 0); }
   function focoEmEntradaDeDados(elemento) {
@@ -2040,7 +2040,7 @@
   $('contactsSearch').addEventListener('input', renderGerenciadorCadastros); $('contactsStatus').addEventListener('change', renderGerenciadorCadastros); $('clearContactsFilters').addEventListener('click', () => { $('contactsSearch').value = ''; $('contactsStatus').value = 'all'; renderGerenciadorCadastros(); });
   $('clientForm').addEventListener('submit', salvarCliente); $('clientType').addEventListener('change', atualizarCamposCliente); $('clientDocument').addEventListener('input', event => { event.target.value = mascaraDocumento(event.target.value); $('clientFormError').textContent = ''; }); $('newClientBtn').addEventListener('click', limparCliente); $('newClientBtnInline').addEventListener('click', limparCliente); $('clientsSearch').addEventListener('input', renderGerenciadorClientes); $('clientsStatus').addEventListener('change', renderGerenciadorClientes); $('clearClientsFilters').addEventListener('click', () => { $('clientsSearch').value = ''; $('clientsStatus').value = 'all'; renderGerenciadorClientes(); });
   $('templatesSearch').addEventListener('input', renderModelos); $('templatesStatus').addEventListener('change', renderModelos); $('clearTemplatesFilters').addEventListener('click', () => { $('templatesSearch').value = ''; $('templatesStatus').value = 'all'; renderModelos(); }); $('newTemplateFromCurrentBtn').addEventListener('click', () => { if (currentDocumentType === 'receipt') { selecionarTipoDocumento('declaration', { ignorarConfirmacao: true }); } salvarModeloAtual(); });
-  $('newContactBtn').addEventListener('click', async () => { await selecionarTipoDocumento('receipt', { ignorarConfirmacao: true }); if (await limpar()) { ativarView('new'); $('tenant').focus(); $('savedTenantStatus').textContent = 'Informe os dados e clique em “Salvar cadastro”.'; } }); $('previewMobileBtn').addEventListener('click', abrirPreview); $('previewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); }); $('genericPreviewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus(); });
+  $('newContactBtn').addEventListener('click', async () => { await selecionarTipoDocumento('receipt', { ignorarConfirmacao: true }); if (await limpar()) { ativarView('new'); $('tenant').focus(); $('savedTenantStatus').textContent = 'Informe os dados e clique em “Salvar cadastro”.'; } }); $('previewMobileBtn').addEventListener('click', abrirPreview); $('previewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus({ preventScroll: true }); }); $('genericPreviewCloseBtn').addEventListener('click', () => { fecharPreview(); $('previewMobileBtn').focus({ preventScroll: true }); });
   $('appMenuToggle').addEventListener('click', () => definirMenuApp(!menuAppAberto()));
   document.addEventListener('click', event => {
     const dismissTip = event.target.closest('[data-dismiss-contextual-tip]');
@@ -2097,7 +2097,7 @@
     if (modal) { e.preventDefault(); solicitarFechamentoModal(modal, 'escape'); }
     else if (menuAppAberto()) { fecharMenuApp(); $('appMenuToggle').focus(); }
     else if (document.querySelector('.history-menu[open]')) { const menu = [...document.querySelectorAll('.history-menu[open]')].at(-1); menu.open = false; menu.querySelector('summary')?.focus(); }
-    else if (document.body.classList.contains('preview-open')) { fecharPreview(); $('previewMobileBtn').focus(); }
+    else if (document.body.classList.contains('preview-open')) { fecharPreview(); $('previewMobileBtn').focus({ preventScroll: true }); }
   });
   document.addEventListener('click', e => { document.querySelectorAll('.history-menu[open]').forEach(menu => { if (!menu.contains(e.target)) menu.open = false; }); });
   window.addEventListener('resize', () => { ajustarAlturaMobile(); if (window.innerWidth >= 768) fecharMenuApp(); });

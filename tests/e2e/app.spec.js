@@ -661,7 +661,7 @@ test('mantém os controles essenciais visíveis sem rolagem horizontal', async (
 });
 
 test('mantém a interface operacional legível e sem rolagem horizontal nas larguras de referência', async ({ page }) => {
-  for (const width of [1280, 900, 767, 380]) {
+  for (const width of [1280, 900, 767, 380, 320]) {
     await page.setViewportSize({ width, height: 844 });
     await selecionarAba(page, /Novo documento/i);
 
@@ -1293,9 +1293,8 @@ test('cancela e arquiva documentos sem diálogos nativos', async ({ page }) => {
   expect(nativeDialogs).toEqual([]);
 });
 
-test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
-  test('reproduz perda de texto com o espaçamento da WCAG 1.4.12', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 844 });
+test.describe('Regressões da auditoria técnica', () => {
+  test('preserva o texto da Gestão com o espaçamento da WCAG 1.4.12', async ({ page }) => {
     await carregarEstadoGestao(page, estadoGestao({
       draftDocuments: [{
         id: 'rascunho-wcag-1412',
@@ -1316,23 +1315,32 @@ test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
       #view-management p { margin-bottom: 2em !important; }
     ` });
 
-    const clipping = await page.locator('#managementContinue .management-row strong').evaluate(element => {
-      const style = getComputedStyle(element);
-      return {
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-        overflow: style.overflow,
-        textOverflow: style.textOverflow,
-        whiteSpace: style.whiteSpace
-      };
-    });
+    for (const width of [1280, 900, 767, 380, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      const layout = await page.locator('#managementContinue .management-row strong').evaluate(element => {
+        const style = getComputedStyle(element);
+        return {
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+          overflow: style.overflow,
+          textOverflow: style.textOverflow,
+          whiteSpace: style.whiteSpace,
+          rowWidth: element.parentElement.clientWidth,
+          pageClientWidth: document.documentElement.clientWidth,
+          pageScrollWidth: document.documentElement.scrollWidth
+        };
+      });
 
-    expect(clipping).toMatchObject({
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap'
-    });
-    expect(clipping.scrollWidth).toBeGreaterThan(clipping.clientWidth);
+      expect(layout.overflow, `overflow em ${width}px`).not.toBe('hidden');
+      expect(layout.textOverflow, `elipse em ${width}px`).not.toBe('ellipsis');
+      expect(layout.whiteSpace, `quebra de linha em ${width}px`).toBe('normal');
+      expect(layout.clientWidth, `título comprimido em ${width}px`).toBeGreaterThanOrEqual(layout.rowWidth * 0.65);
+      expect(layout.scrollWidth, `texto horizontalmente cortado em ${width}px`).toBeLessThanOrEqual(layout.clientWidth + 1);
+      expect(layout.scrollHeight, `texto verticalmente cortado em ${width}px`).toBeLessThanOrEqual(layout.clientHeight + 1);
+      expect(layout.pageScrollWidth, `rolagem horizontal em ${width}px`).toBeLessThanOrEqual(layout.pageClientWidth);
+    }
   });
 
   test('usa navegação agrupada comum sem papéis de abas nem captura de setas', async ({ page }) => {
@@ -1374,7 +1382,7 @@ test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
     await expect(page.getByLabel('Incluir rodapé institucional no documento')).toHaveCount(1);
   });
 
-  test('reproduz controles de formatação e reordenação com menos de 44 px', async ({ page }) => {
+  test('mantém controles de formatação e reordenação com pelo menos 44 por 44 px', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 844 });
     await selecionarAba(page, /Modelos/i);
 
@@ -1393,14 +1401,107 @@ test.describe('Fase 0 — caracterização dos achados da auditoria', () => {
         .filter(({ width, height }) => width < 44 || height < 44)
       );
 
-    expect(undersizedTargets.map(({ name }) => name)).toEqual([
-      'Mover campo 1 para cima',
-      'Mover campo 1 para baixo',
-      'Negrito',
-      'Itálico',
-      'Sublinhado'
-    ]);
-    expect(undersizedTargets.every(({ width }) => width < 44)).toBe(true);
+    expect(undersizedTargets).toEqual([]);
+  });
+});
+
+test.describe('Fase 3 — reflow, texto ampliado e toque', () => {
+  test('mantém campos, filtros e labels de checkbox com alvo efetivo de 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 380, height: 844 });
+    const samples = [];
+
+    for (const [view, selector, reveal] of [
+      [/Novo documento/i, '#view-new .field input, #view-new .field select, #view-new .field textarea'],
+      [/Histórico/i, '#view-history .filter-field input, #view-history .filter-field select', '#historyFiltersToggle'],
+      [/Modelos/i, '#view-templates .template-field-control input, #view-templates .template-field-control select, #view-templates .template-field-options textarea, #view-templates .template-toolbar select']
+    ]) {
+      await selecionarAba(page, view);
+      if (reveal) await page.locator(reveal).click();
+      const controls = await page.locator(selector).evaluateAll(elements => elements
+        .filter(element => element.getClientRects().length && !['checkbox', 'radio'].includes(element.type))
+        .map(element => ({
+          name: element.getAttribute('aria-label') || element.id || element.name,
+          height: element.getBoundingClientRect().height
+        }))
+      );
+      expect(controls.length, `controles visíveis em ${view}`).toBeGreaterThan(0);
+      samples.push(...controls);
+    }
+
+    expect(samples.filter(({ height }) => height < 44), JSON.stringify(samples, null, 2)).toEqual([]);
+
+    await selecionarAba(page, /Novo documento/i);
+    await page.getByRole('button', { name: 'Contrato', exact: true }).click();
+    const checkboxLabel = page.locator('.clause-library .check-row').first();
+    const checkbox = checkboxLabel.locator('input');
+    const labelBox = await checkboxLabel.boundingBox();
+    const checkboxBox = await checkbox.boundingBox();
+    expect(labelBox?.height || 0).toBeGreaterThanOrEqual(44);
+    expect(labelBox?.width || 0).toBeGreaterThanOrEqual(44);
+    expect(checkboxBox?.width || 0).toBeLessThan(44);
+    await checkboxLabel.click({ position: { x: (labelBox?.width || 44) - 8, y: (labelBox?.height || 44) / 2 } });
+    await expect(checkbox).toBeChecked();
+  });
+
+  test('mantém o último controle e os erros acima da barra fixa móvel', async ({ page }) => {
+    for (const width of [380, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await selecionarAba(page, /Novo documento/i);
+      await page.locator('#issueBtn').click();
+
+      for (const selector of ['#receiptDate', '#propertyError']) {
+        await page.locator(selector).evaluate(element => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
+        const positions = await page.evaluate((targetSelector) => {
+          const target = document.querySelector(targetSelector).getBoundingClientRect();
+          const actions = [...document.querySelectorAll('.actions')]
+            .find(element => element.getClientRects().length)
+            .getBoundingClientRect();
+          return { targetBottom: target.bottom, actionsTop: actions.top };
+        }, selector);
+        expect(positions.targetBottom, `${selector} coberto em ${width}px`).toBeLessThanOrEqual(positions.actionsTop - 8);
+      }
+    }
+  });
+
+  test('abre e fecha a prévia móvel sem deslocar a página e preserva as safe areas', async ({ page }) => {
+    await page.setViewportSize({ width: 380, height: 844 });
+    await selecionarAba(page, /Novo documento/i);
+    await page.evaluate(() => window.scrollTo(0, Math.min(360, document.documentElement.scrollHeight - innerHeight)));
+    const before = await page.evaluate(() => ({ scrollY, panelLeft: document.querySelector('.panel').getBoundingClientRect().left }));
+
+    await page.locator('#previewMobileBtn').evaluate(button => button.click());
+    await expect(page.locator('body')).toHaveClass(/preview-open/);
+    const opened = await page.evaluate(() => {
+      const workspace = document.querySelector('.workspace').getBoundingClientRect();
+      return {
+        scrollY,
+        panelLeft: document.querySelector('.panel').getBoundingClientRect().left,
+        workspaceLeft: workspace.left,
+        workspaceRight: workspace.right,
+        viewportWidth: innerWidth,
+        actionVisible: Boolean([...document.querySelectorAll('.actions')].find(element => element.getClientRects().length)),
+        viewportFit: document.querySelector('meta[name="viewport"]')?.content || '',
+        safeAreaRule: [...document.styleSheets].some(sheet => {
+          try {
+            return [...sheet.cssRules].some(rule => rule.cssText.includes('safe-area-inset-bottom'));
+          } catch {
+            return false;
+          }
+        })
+      };
+    });
+
+    expect(opened.scrollY).toBe(before.scrollY);
+    expect(opened.panelLeft).toBeCloseTo(before.panelLeft, 0);
+    expect(opened.workspaceLeft).toBeGreaterThanOrEqual(0);
+    expect(opened.workspaceRight).toBeLessThanOrEqual(opened.viewportWidth);
+    expect(opened.actionVisible).toBe(false);
+    expect(opened.viewportFit).toContain('viewport-fit=cover');
+    expect(opened.safeAreaRule).toBe(true);
+
+    await page.locator('#previewCloseBtn').click();
+    await expect(page.locator('body')).not.toHaveClass(/preview-open/);
+    expect(await page.evaluate(() => scrollY)).toBe(before.scrollY);
   });
 });
 
