@@ -5,17 +5,22 @@ colors:
   primary: "#b70d18"
   primary-dark: "#8f0710"
   primary-soft: "#fff1f2"
-  routine-info: "#57C4E5"
+  routine-info: "#57c4e5"
   surface: "#fff"
   surface-muted: "#f7f8fa"
   canvas: "#eef1f5"
+  control: "#eef1f4"
+  control-hover: "#e5e8ec"
   border: "#dde2e8"
   border-strong: "#c9d0d8"
   text: "#20242b"
   muted: "#68717d"
   success: "#237a43"
+  success-soft: "#eaf7ee"
   warning: "#8a6116"
+  warning-soft: "#fff8e8"
   danger: "#b42318"
+  danger-soft: "#fff0f0"
 typography:
   display:
     fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
@@ -39,6 +44,16 @@ spacing:
   field: "13px"
   panel: "18px"
   section: "22px"
+interaction:
+  minimumTarget: "44px"
+  focusRing: "0 0 0 3px rgba(183, 13, 24, 0.16)"
+document:
+  pageWidth: "210mm"
+  pageHeight: "297mm"
+  fontFamily: "Calibri, 'Carlito', 'Segoe UI', Arial, sans-serif"
+  genericFontFamily: "Arial, sans-serif"
+  brand: "#c00000"
+  text: "#222"
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
@@ -47,7 +62,7 @@ components:
     padding: "12px 14px"
     height: "44px"
   button-secondary:
-    backgroundColor: "#eef1f4"
+    backgroundColor: "{colors.control}"
     textColor: "{colors.text}"
     rounded: "{rounded.button}"
     padding: "12px 14px"
@@ -95,7 +110,7 @@ A paleta é predominantemente neutra, com cor aplicada para prioridade, orienta�
 
 ### Secondary
 
-- **Azul de Informação** (`{colors.routine-info}`): informações rotineiras, orientação contextual e indicadores que não exigem ação imediata. É uma decisão de sistema confirmada para as próximas implementações; introduza-o no CSS com teste de contraste quando esse uso for construído.
+- **Azul de Informação** (`{colors.routine-info}`): informações rotineiras, orientação contextual e indicadores que não exigem ação imediata. O token `--info` e suas variações de superfície, borda e contraste são canônicos na interface.
 
 ### Neutral
 
@@ -194,12 +209,29 @@ O foco visível é uma auréola institucional de três pixels. Controles mantêm
 - **Desktop:** a prévia A4 se mantém próxima ao formulário para validação contínua.
 - **Mobile and print:** no celular, abre como camada própria; na impressão, torna-se a única superfície visível.
 
+## CSS Architecture
+
+`DESIGN.md` é a fonte de verdade do sistema visual; `src/styles/styles.css` é sua implementação canônica e `.impeccable/design.json` é o sidecar estruturado derivado. O CSS mantém um único bloco `:root` e segue esta ordem conceitual:
+
+1. **Tokens e base:** cores, tipografia global, raios, sombras, espaçamento e tamanho mínimo de controle.
+2. **Interface operacional:** emissão, formulários, navegação, modais e feedback.
+3. **Gestão e administração:** Gestão, histórico, clientes, dossiês, modelos, backup e governança.
+4. **Prévia documental A4:** composição física, tipografia e cores documentais isoladas por tokens `--doc-*`.
+5. **Impressão A4:** únicas regras autorizadas a usar `!important`, para neutralizar o chrome da aplicação e fixar a folha.
+6. **Responsividade:** adaptações progressivas de tablet, celular, safe areas e movimento reduzido.
+
+As medidas de `210mm × 297mm`, os tamanhos em `pt/mm`, a tipografia documental e o texto justificado são exceções deliberadas da folha. Não devem vazar para a interface operacional.
+
+### Build baseline
+
+O baseline anterior da folha compilada era **75,30 kB / 15,27 kB gzip**. Após a adoção de nomes semânticos para todas as cores de tela, o artefato ficou em **79,05 kB / 14,79 kB gzip**: o texto não comprimido cresce 3,75 kB por causa das referências `var(...)`, enquanto a transferência comprimida cai 0,48 kB. A variação bruta é aceita porque elimina cores literais e conflitos de cascata, e reduz o tamanho efetivamente transferido.
+
 ## Do's and Don'ts
 
 ### Do:
 
 - **Do** mantenha o Vermelho Institucional para ação principal, seleção ativa, obrigatoriedade e alerta.
-- **Do** use o Azul de Informação para mensagens rotineiras e orientação contextual, após implementar o token e verificar contraste.
+- **Do** use o Azul de Informação para mensagens rotineiras e orientação contextual, sempre com a variação de contraste apropriada.
 - **Do** associe rótulos, ajuda, erro e foco ao campo correspondente; o estado deve ser entendido sem depender apenas de cor.
 - **Do** preserve o fluxo formulário → prévia A4 → confirmação → emissão, com ações críticas sempre alcançáveis.
 - **Do** adapte a estrutura para uma coluna e uma prévia dedicada no celular, mantendo controles de toque e leitura confortáveis.

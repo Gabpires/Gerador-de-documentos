@@ -10,7 +10,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "playwright test",
-    "test:api": "node --test tests/server/templates.test.mjs",
+    "test:api": "node --test \"tests/server/*.test.mjs\"",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",

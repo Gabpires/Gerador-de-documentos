@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-28T11:02:34.7011157-03:00",
+  "generatedAt": "2026-09-29T22:51:51.0279515-03:00",
   "title": "Design System: Paraíba Imóveis",
   "extensions": {
     "colorMeta": {
@@ -25,7 +25,7 @@
       "routine-info": {
         "role": "secondary",
         "displayName": "Azul de Informação",
-        "canonical": "#57C4E5",
+        "canonical": "#57c4e5",
         "tonalRamp": ["#103947", "#1d6176", "#2e8eaa", "#57C4E5", "#81d3eb", "#afe2f2", "#d7f1f9", "#f2fbfd"]
       },
       "surface": {
@@ -138,7 +138,36 @@
       { "name": "tablet", "value": "900px" },
       { "name": "mobile", "value": "767px" },
       { "name": "narrow", "value": "380px" }
-    ]
+    ],
+    "cssArchitecture": {
+      "sourceOfTruth": "DESIGN.md",
+      "implementation": "src/styles/styles.css",
+      "tokenRootCount": 1,
+      "sections": [
+        "Tokens e base",
+        "Interface operacional",
+        "Gestão e administração",
+        "Prévia documental A4",
+        "Impressão A4",
+        "Responsividade"
+      ],
+      "screenColorLiteralsOutsideTokens": 0,
+      "importantPolicy": "Somente dentro de @media print"
+    },
+    "document": {
+      "width": "210mm",
+      "height": "297mm",
+      "receiptFontFamily": "Calibri, 'Carlito', 'Segoe UI', Arial, sans-serif",
+      "genericFontFamily": "Arial, sans-serif",
+      "brandToken": "--doc-brand",
+      "textToken": "--doc-text",
+      "alignment": "justified"
+    },
+    "buildBaseline": {
+      "before": { "css": "75.30 kB", "gzip": "15.27 kB" },
+      "after": { "css": "79.05 kB", "gzip": "14.79 kB" },
+      "justification": "As referências semânticas var(...) ampliam o texto bruto, mas eliminam cores literais e reduzem o artefato transferido em gzip."
+    }
   },
   "components": [
     {
@@ -147,7 +176,7 @@
       "refersTo": "button-primary",
       "description": "Confirma emissão, criação ou outra ação operacional principal.",
       "html": "<button class=\"ds-btn-primary\" type=\"button\">Emitir documento</button>",
-      "css": ".ds-btn-primary { min-height: 44px; padding: 12px 14px; border: 0; border-radius: 10px; background: var(--brand, #b70d18); color: #fff; font: 800 12px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-btn-primary:hover { background: var(--brand-dark, #8f0710); } .ds-btn-primary:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+      "css": ".ds-btn-primary { min-height: var(--control-min-size, 44px); padding: 12px 14px; border: 0; border-radius: var(--radius-button, 10px); background: var(--brand, #b70d18); color: var(--surface, #fff); font: 800 12px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-btn-primary:hover { background: var(--brand-dark, #8f0710); } .ds-btn-primary:focus-visible { outline: 0; box-shadow: var(--focus, 0 0 0 3px rgba(183, 13, 24, 0.16)); }"
     },
     {
       "name": "Botão secundário",
@@ -155,7 +184,7 @@
       "refersTo": "button-secondary",
       "description": "Oferece ações de apoio sem competir com a emissão.",
       "html": "<button class=\"ds-btn-secondary\" type=\"button\">Salvar rascunho</button>",
-      "css": ".ds-btn-secondary { min-height: 44px; padding: 12px 14px; border: 0; border-radius: 10px; background: #eef1f4; color: #303640; font: 800 12px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-btn-secondary:hover { background: #e5e8ec; } .ds-btn-secondary:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+      "css": ".ds-btn-secondary { min-height: var(--control-min-size, 44px); padding: 12px 14px; border: 0; border-radius: var(--radius-button, 10px); background: var(--control, #eef1f4); color: var(--text-strong, #30343b); font: 800 12px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-btn-secondary:hover { background: var(--control-hover, #e5e8ec); } .ds-btn-secondary:focus-visible { outline: 0; box-shadow: var(--focus, 0 0 0 3px rgba(183, 13, 24, 0.16)); }"
     },
     {
       "name": "Campo de formulário",
@@ -163,7 +192,7 @@
       "refersTo": "field-input",
       "description": "Recebe dados operacionais com rótulo e estado de foco claramente associados.",
       "html": "<label class=\"ds-field\">Nome do locatário<input class=\"ds-input\" type=\"text\" placeholder=\"Nome completo\" /></label>",
-      "css": ".ds-field { display: grid; gap: 6px; color: #20242b; font: 700 12px Inter, 'Segoe UI', Arial, sans-serif; } .ds-input { min-height: 44px; padding: 11px 12px; border: 1px solid #c9d0d8; border-radius: 9px; background: #fff; color: #20242b; font: 400 14px Inter, 'Segoe UI', Arial, sans-serif; } .ds-input:focus-visible { outline: 0; border-color: var(--brand, #b70d18); box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+      "css": ".ds-field { display: grid; gap: 6px; color: var(--text, #20242b); font: 700 12px Inter, 'Segoe UI', Arial, sans-serif; } .ds-input { min-height: var(--control-min-size, 44px); padding: 11px 12px; border: 1px solid var(--border-strong, #c9d0d8); border-radius: var(--radius-field, 9px); background: var(--surface, #fff); color: var(--text, #20242b); font: 400 14px Inter, 'Segoe UI', Arial, sans-serif; } .ds-input:focus-visible { outline: 0; border-color: var(--brand, #b70d18); box-shadow: var(--focus, 0 0 0 3px rgba(183, 13, 24, 0.16)); }"
     },
     {
       "name": "Aba ativa",
@@ -171,7 +200,7 @@
       "refersTo": "tab-active",
       "description": "Indica a área atual da operação dentro da navegação persistente.",
       "html": "<nav class=\"ds-tabs\" aria-label=\"Áreas\"><button class=\"ds-tab\" type=\"button\" aria-selected=\"true\">Novo documento</button><button class=\"ds-tab\" type=\"button\" aria-selected=\"false\">Histórico</button></nav>",
-      "css": ".ds-tabs { display: flex; gap: 5px; padding: 5px; border: 1px solid #dde2e8; border-radius: 15px; background: rgba(255, 255, 255, 0.94); } .ds-tab { min-height: 44px; padding: 9px 15px; border: 0; border-radius: 10px; background: transparent; color: #5f6874; font: 800 12.5px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-tab:hover { background: #f3f4f6; } .ds-tab[aria-selected='true'] { background: var(--brand, #b70d18); color: #fff; box-shadow: 0 5px 14px rgba(183, 13, 24, 0.2); } .ds-tab:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(183, 13, 24, 0.16); }"
+      "css": ".ds-tabs { display: flex; gap: 5px; padding: 5px; border: 1px solid var(--border, #dde2e8); border-radius: 15px; background: var(--surface-translucent-nav, rgba(255, 255, 255, 0.94)); } .ds-tab { min-height: var(--control-min-size, 44px); padding: 9px 15px; border: 0; border-radius: var(--radius-tab, 10px); background: transparent; color: var(--muted-strong, #56616d); font: 800 12.5px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-tab:hover { background: var(--canvas, #eef1f5); } .ds-tab[aria-selected='true'] { background: var(--brand, #b70d18); color: var(--surface, #fff); box-shadow: 0 5px 14px var(--brand-shadow-color, rgba(183, 13, 24, 0.22)); } .ds-tab:focus-visible { outline: 0; box-shadow: var(--focus, 0 0 0 3px rgba(183, 13, 24, 0.16)); }"
     },
     {
       "name": "Cartão de conteúdo",
@@ -179,7 +208,7 @@
       "refersTo": "content-card",
       "description": "Agrupa histórico, cadastros, modelos e segurança como superfícies de trabalho.",
       "html": "<section class=\"ds-card\"><h3>Histórico de documentos</h3><p>Consulte e filtre emissões registradas localmente.</p></section>",
-      "css": ".ds-card { padding: clamp(18px, 2.5vw, 28px); border: 1px solid #dde2e8; border-radius: 20px; background: #fff; color: #20242b; box-shadow: 0 12px 32px rgba(22, 29, 37, 0.08); font: 400 14px/1.45 Inter, 'Segoe UI', Arial, sans-serif; } .ds-card h3 { margin: 0 0 4px; font-size: 18px; } .ds-card p { margin: 0; color: #68717d; }"
+      "css": ".ds-card { padding: clamp(18px, 2.5vw, 28px); border: 1px solid var(--border, #dde2e8); border-radius: var(--radius-card, 20px); background: var(--surface, #fff); color: var(--text, #20242b); box-shadow: var(--shadow-ui, 0 12px 32px rgba(22, 29, 37, 0.08)); font: 400 14px/1.45 Inter, 'Segoe UI', Arial, sans-serif; } .ds-card h3 { margin: 0 0 4px; font-size: 18px; } .ds-card p { margin: 0; color: var(--muted, #68717d); }"
     }
   ],
   "narrative": {
@@ -210,7 +239,7 @@
     ],
     "dos": [
       "Do mantenha o Vermelho Institucional para ação principal, seleção ativa, obrigatoriedade e alerta.",
-      "Do use o Azul de Informação para mensagens rotineiras e orientação contextual, após implementar o token e verificar contraste.",
+      "Do use o Azul de Informação para mensagens rotineiras e orientação contextual, sempre com a variação de contraste apropriada.",
       "Do associe rótulos, ajuda, erro e foco ao campo correspondente; o estado deve ser entendido sem depender apenas de cor.",
       "Do preserve o fluxo formulário → prévia A4 → confirmação → emissão, com ações críticas sempre alcançáveis.",
       "Do adapte a estrutura para uma coluna e uma prévia dedicada no celular, mantendo controles de toque e leitura confortáveis."
