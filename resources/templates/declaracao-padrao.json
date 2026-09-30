@@ -4,13 +4,53 @@
   "name": "Declaração",
   "documentKind": "declaration",
   "status": "active",
-  "revision": 1,
+  "revision": 5,
   "createdAt": "2026-09-25T00:00:00.000Z",
-  "updatedAt": "2026-09-25T00:00:00.000Z",
+  "updatedAt": "2026-09-30T14:12:48.582Z",
   "fields": [
-    { "id": "titulo", "name": "Título", "tag": "{{TITULO}}", "type": "text", "required": true, "defaultValue": "DECLARAÇÃO", "helpText": "", "validation": "none", "options": [] },
-    { "id": "declarante", "name": "Declarante", "tag": "{{DECLARANTE}}", "type": "text", "required": true, "defaultValue": "", "helpText": "", "validation": "none", "options": [] },
-    { "id": "texto", "name": "Texto da declaração", "tag": "{{TEXTO}}", "type": "textarea", "required": true, "defaultValue": "", "helpText": "", "validation": "none", "options": [] },
-    { "id": "data", "name": "Data", "tag": "{{DATA}}", "type": "date", "required": true, "defaultValue": "", "helpText": "", "validation": "date", "options": [] }
+    {
+      "id": "titulo",
+      "name": "Título",
+      "tag": "{{TITULO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "DECLARAÇÃO",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "declarante",
+      "name": "Declarante",
+      "tag": "{{DECLARANTE}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "texto",
+      "name": "Texto da declaração",
+      "tag": "{{TEXTO}}",
+      "type": "textarea",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "data",
+      "name": "Data",
+      "tag": "{{DATA}}",
+      "type": "date",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "date",
+      "options": []
+    }
   ]
 }

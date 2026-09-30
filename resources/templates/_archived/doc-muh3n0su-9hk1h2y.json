@@ -3,10 +3,10 @@
   "id": "doc-muh3n0su-9hk1h2y",
   "name": "locação teste",
   "documentKind": "contract",
-  "status": "active",
-  "revision": 1,
+  "status": "archived",
+  "revision": 2,
   "createdAt": "2026-09-25T20:42:03.108Z",
-  "updatedAt": "2026-09-25T20:42:03.110Z",
+  "updatedAt": "2026-09-30T13:58:27.434Z",
   "fields": [
     {
       "id": "campo_0",

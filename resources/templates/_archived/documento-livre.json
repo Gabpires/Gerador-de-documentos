@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "documento-livre",
+  "name": "Documento livre",
+  "documentKind": "custom",
+  "status": "archived",
+  "revision": 2,
+  "createdAt": "2026-09-25T00:00:00.000Z",
+  "updatedAt": "2026-09-30T13:58:27.182Z",
+  "fields": [
+    {
+      "id": "titulo",
+      "name": "Título",
+      "tag": "{{TITULO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "DOCUMENTO",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "conteudo",
+      "name": "Conteúdo",
+      "tag": "{{CONTEUDO}}",
+      "type": "textarea",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    }
+  ]
+}

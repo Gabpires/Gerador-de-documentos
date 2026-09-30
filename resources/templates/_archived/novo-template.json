@@ -3,10 +3,10 @@
   "id": "novo-template",
   "name": "Novo template",
   "documentKind": "contract",
-  "status": "active",
-  "revision": 1,
+  "status": "archived",
+  "revision": 2,
   "createdAt": "2026-09-28T13:02:39.291Z",
-  "updatedAt": "2026-09-28T13:02:39.293Z",
+  "updatedAt": "2026-09-30T13:58:27.847Z",
   "fields": [
     {
       "id": "nome_locatario",

@@ -4,14 +4,64 @@
   "name": "Recibo de aluguel",
   "documentKind": "receipt",
   "status": "active",
-  "revision": 1,
+  "revision": 3,
   "createdAt": "2026-09-25T00:00:00.000Z",
-  "updatedAt": "2026-09-25T00:00:00.000Z",
+  "updatedAt": "2026-09-30T14:36:20.223Z",
   "fields": [
-    { "id": "locatario", "name": "Nome do locatário", "tag": "{{LOCATARIO}}", "type": "text", "required": true, "defaultValue": "", "helpText": "Pessoa que realizou o pagamento.", "validation": "none", "options": [] },
-    { "id": "documento", "name": "CPF ou CNPJ", "tag": "{{DOCUMENTO}}", "type": "text", "required": true, "defaultValue": "", "helpText": "", "validation": "cpfCnpj", "options": [] },
-    { "id": "imovel", "name": "Imóvel", "tag": "{{IMOVEL}}", "type": "textarea", "required": true, "defaultValue": "", "helpText": "", "validation": "none", "options": [] },
-    { "id": "valor", "name": "Valor recebido", "tag": "{{VALOR}}", "type": "currency", "required": true, "defaultValue": "", "helpText": "", "validation": "currency", "options": [] },
-    { "id": "data", "name": "Data", "tag": "{{DATA}}", "type": "date", "required": true, "defaultValue": "", "helpText": "", "validation": "date", "options": [] }
+    {
+      "id": "locatario",
+      "name": "Nome do locatário",
+      "tag": "{{LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "Pessoa que realizou o pagamento.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "documento",
+      "name": "CPF ou CNPJ",
+      "tag": "{{DOCUMENTO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "cpfCnpj",
+      "options": []
+    },
+    {
+      "id": "imovel",
+      "name": "Imóvel",
+      "tag": "{{IMOVEL}}",
+      "type": "textarea",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "valor",
+      "name": "Valor recebido",
+      "tag": "{{VALOR}}",
+      "type": "currency",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "currency",
+      "options": []
+    },
+    {
+      "id": "data",
+      "name": "Data",
+      "tag": "{{DATA}}",
+      "type": "date",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "date",
+      "options": []
+    }
   ]
 }
