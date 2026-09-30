@@ -72,8 +72,8 @@ async function esperarSemViolacoesAxeGraves(page, include) {
 }
 
 test('carrega o gerador com a gestão como centro de navegação', async ({ page }) => {
-  await expect(page).toHaveTitle(/Gerador de Recibos de Aluguel/i);
-  await expect(page.getByRole('heading', { name: 'Gerador de documentos' })).toBeVisible();
+  await expect(page).toHaveTitle(/Gerador e Gestão de Documentos/i);
+  await expect(page.getByRole('heading', { name: 'Gerador e Gestão de Documentos' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Gestão documental' })).toBeVisible();
 
   await selecionarAba(page, /Dossiês/i);
@@ -207,6 +207,11 @@ test('oferece backup após a primeira emissão e atualiza o estado ao exportar',
   await expect(page.locator('#backupReminder')).toBeVisible();
   await expect(page.locator('#storageIndicatorText')).toContainText('sem backup');
   await expect(page.locator('#backupReminder')).toContainText('não há uma exportação de backup registrada');
+
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('#backupReminder')).toBeHidden();
+  await expect(page.locator('#receipt')).toBeVisible();
+  await page.emulateMedia({ media: 'screen' });
 
   const download = page.waitForEvent('download');
   await page.locator('#backupReminderExportBtn').click();

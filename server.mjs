@@ -132,6 +132,7 @@ function staticFile(rootDir, pathname) {
   return candidate.startsWith(rootDir + sep) ? candidate : null;
 }
 function contentType(file) { return ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' })[extname(file)] || 'application/octet-stream'; }
+const productionCsp = "default-src 'self'; base-uri 'none'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'";
 async function start() {
   const dev = process.argv.includes('--dev');
   const portIndex = process.argv.indexOf('--port');
@@ -153,11 +154,11 @@ async function start() {
       const distRoot = resolve(root, 'src', 'dist');
       const target = staticFile(distRoot, url.pathname);
       if (!target) return text(response, 404, 'Não encontrado.');
-      try { response.writeHead(200, { 'content-type': contentType(target), 'content-security-policy': "default-src 'self'; base-uri 'none'; object-src 'none'" }); response.end(await readFile(target)); } catch { if (url.pathname !== '/') text(response, 404, 'Não encontrado.'); else { response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); response.end(await readFile(join(distRoot, 'index.html'))); } }
+      try { response.writeHead(200, { 'content-type': contentType(target), 'content-security-policy': productionCsp }); response.end(await readFile(target)); } catch { if (url.pathname !== '/') text(response, 404, 'Não encontrado.'); else { response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': productionCsp }); response.end(await readFile(join(distRoot, 'index.html'))); } }
     } catch { if (!response.headersSent && !response.writableEnded) text(response, 500, 'Erro interno do servidor local.'); }
   });
   server.listen(port, '127.0.0.1', () => console.log(`Gerador local em http://127.0.0.1:${port}`));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) start();
-export { validateDefinition, safeHtml, validId, resourcesRoot };
+export { validateDefinition, safeHtml, validId, resourcesRoot, productionCsp };
