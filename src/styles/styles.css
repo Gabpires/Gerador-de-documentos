@@ -652,7 +652,7 @@ summary:focus-visible,
 
 .app-brand p {
   margin: 3px 0 0;
-  color: var(--muted);
+  color: var(--muted-strong);
   font-size: 12.5px;
 }
 
@@ -1426,6 +1426,23 @@ summary:focus-visible,
   margin-top: 16px;
 }
 
+.dynamic-document-form .field {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.dynamic-document-form textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  padding: 11px 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .dynamic-validation-summary {
   padding: 13px 14px;
   border: 1px solid var(--danger-border);
@@ -1703,7 +1720,7 @@ summary:focus-visible,
     flex-wrap: wrap;
     gap: 6px 12px;
     margin: -8px 3px 14px;
-    color: var(--muted);
+    color: var(--muted-strong);
     font-size: 12px;
     line-height: 1.45;
   }
@@ -2617,7 +2634,8 @@ summary:focus-visible,
 
 .template-resource-card.is-archived {
   background: var(--surface-muted);
-  opacity: .82;
+  border-color: var(--border-strong);
+  border-style: dashed;
 }
 
 .template-resource-card h3 {
@@ -2629,6 +2647,10 @@ summary:focus-visible,
   margin: 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.template-resource-card.is-archived p {
+  color: var(--muted-strong);
 }
 
 .template-resource-card .contact-actions {
@@ -3535,6 +3557,7 @@ summary:focus-visible,
 
 [hidden],
 .view-panel[hidden],
+.view-panel .app[hidden],
 #genericEditor[hidden],
 #receiptEditor[hidden],
 #genericPreviewArea[hidden],

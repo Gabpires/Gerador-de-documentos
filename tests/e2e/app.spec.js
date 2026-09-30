@@ -1011,9 +1011,17 @@ test('guia pendências do template, mantém rascunho editável e emite somente o
 
   const card = page.locator(`.template-resource-card[data-template-id="${templateId}"]`);
   await card.getByRole('button', { name: 'Usar documento' }).click();
+  await expect(page.locator('#view-new > .app')).toHaveCSS('display', 'none');
   await expect(page.locator('#dynamicCompletionStatus')).toContainText('0 de 3 campos obrigatórios preenchidos');
   await expect(page.locator('#dynamicCompletionStatus')).toContainText('Locatário do teste');
   await expect(page.locator('#dynamicPendingList')).toContainText('Aceite da vistoria');
+  const dynamicTextarea = page.locator('.dynamic-document-form textarea').first();
+  await expect(dynamicTextarea).toBeVisible();
+  expect(await dynamicTextarea.evaluate(element => {
+    const width = element.getBoundingClientRect().width;
+    const fieldWidth = element.closest('.field').getBoundingClientRect().width;
+    return width >= fieldWidth - 2;
+  })).toBe(true);
 
   await page.locator('#saveDynamicDraftBtn').click();
   await expect(page.locator('#dynamicDraftState')).toContainText('Rascunho salvo');
@@ -1562,7 +1570,11 @@ test.describe('Fase 2 — semântica e acessibilidade', () => {
       const groupToggle = page.getByRole('button', { name: destination.group, exact: true });
       if (await groupToggle.getAttribute('aria-expanded') !== 'true') await groupToggle.click();
       await expect(page.locator(`#${await groupToggle.getAttribute('aria-controls')}`)).toHaveCSS('opacity', '1');
-      await esperarSemViolacoesAxeGraves(page, ['#appTabs', `#view-${destination.id.replace('tab-', '')}`]);
+      await expect(page.locator(`#view-${destination.id.replace('tab-', '')}`)).toHaveCSS('opacity', '1');
+      if (destination.id === 'tab-templates') {
+        await expect(page.locator('#templateCatalog .template-resource-card').first()).toBeVisible();
+      }
+      await esperarSemViolacoesAxeGraves(page);
       await page.keyboard.press('Escape');
     });
   }

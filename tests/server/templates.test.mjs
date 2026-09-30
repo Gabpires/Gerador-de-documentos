@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
 import { safeHtml, validateDefinition } from '../../server.mjs';
 
@@ -44,4 +46,22 @@ test('rejeita conteúdo HTML ativo ou remoto', () => {
   assert.throws(() => safeHtml('<img src="https://exemplo.test/x.png">'));
   assert.throws(() => safeHtml('<style>p{background:url(//exemplo.test/x)}</style>'));
   assert.equal(safeHtml('<p>{{CLIENTE}}</p>'), '<p>{{CLIENTE}}</p>');
+});
+
+async function arquivosDoDiretorio(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(entries.map(entry => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? arquivosDoDiretorio(path) : path;
+  }));
+  return files.flat();
+}
+
+test('não versiona dados pessoais de clientes nos templates', async () => {
+  const paths = await arquivosDoDiretorio(join(process.cwd(), 'resources', 'templates'));
+  const contents = (await Promise.all(paths.map(path => readFile(path, 'utf8')))).join('\n');
+  assert.doesNotMatch(contents, /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/, 'CPF formatado encontrado nos templates');
+  assert.doesNotMatch(contents, /\b\d{1,2}\.\d{3}\.\d{3}-[\dX]\b/i, 'RG formatado encontrado nos templates');
+  assert.doesNotMatch(contents, /\b\d{5}-\d{3}\b/, 'CEP formatado encontrado nos templates');
+  assert.doesNotMatch(contents, /Maria Regina|João Pedro Porto|Gabriel Pires|Edmundo Amaral|Rua da Penha|Adelino Marucci|Brunami/i, 'Identificador do conjunto de dados removido encontrado nos templates');
 });

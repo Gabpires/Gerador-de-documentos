@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "id": "locacao-residencial-demonstrativa",
+  "name": "Locação residencial demonstrativa",
+  "documentKind": "contract",
+  "status": "active",
+  "revision": 4,
+  "createdAt": "2026-09-29T14:21:45.717Z",
+  "updatedAt": "2026-09-30T14:23:14.313Z",
+  "fields": [
+    {
+      "id": "nome_locatario",
+      "name": "Nome do Locatário",
+      "tag": "{{NOME_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Nome completo do locatário",
+      "helpText": "informar sempre nome completo conforme documento de identidade do locatário",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "cpf_locatario",
+      "name": "CPF do Locatário",
+      "tag": "{{CPF_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Informe CPF",
+      "helpText": "Informar CPF como consta no documento de identidade do locatário",
+      "validation": "cpfCnpj",
+      "options": []
+    },
+    {
+      "id": "nacionalidade_locatario",
+      "name": "Nacionalidade do Locatário",
+      "tag": "{{NACIONALIDADE_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Informar Nacionalidade",
+      "helpText": "Informar a nacionalidade do locatário",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "profissao_locatario",
+      "name": "Profissão do Locatário",
+      "tag": "{{PROFISSAO_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "Profissão",
+      "helpText": "Informar a profissão do locatário",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "nome_locadora",
+      "name": "Nome da locadora",
+      "tag": "{{NOME_DA_LOCADORA}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "Informe o nome completo da pessoa locadora.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "qualificacao_locadora",
+      "name": "Qualificação da locadora",
+      "tag": "{{QUALIFICACAO_DA_LOCADORA}}",
+      "type": "textarea",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "Informe nacionalidade, estado civil, profissão, documento e endereço.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "estado_civil_locatario",
+      "name": "Estado civil do locatário",
+      "tag": "{{ESTADO_CIVIL_DO_LOCATARIO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "endereco_locatario",
+      "name": "Endereço do locatário",
+      "tag": "{{ENDERECO_DO_LOCATARIO}}",
+      "type": "textarea",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "Informe o endereço completo somente durante a emissão.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "endereco_imovel",
+      "name": "Endereço do imóvel",
+      "tag": "{{ENDERECO_DO_IMOVEL}}",
+      "type": "textarea",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "Informe o endereço completo do imóvel locado.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "observacao_garagem",
+      "name": "Observação sobre garagem",
+      "tag": "{{OBSERVACAO_SOBRE_GARAGEM}}",
+      "type": "text",
+      "required": false,
+      "defaultValue": "",
+      "helpText": "Exemplo: com direito a uma vaga de garagem.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "prazo_locacao",
+      "name": "Prazo da locação",
+      "tag": "{{PRAZO_DA_LOCACAO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "Exemplo: 24 (vinte e quatro) meses.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "data_inicio",
+      "name": "Data de início",
+      "tag": "{{DATA_DE_INICIO}}",
+      "type": "date",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "date",
+      "options": []
+    },
+    {
+      "id": "data_termino",
+      "name": "Data de término",
+      "tag": "{{DATA_DE_TERMINO}}",
+      "type": "date",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "date",
+      "options": []
+    },
+    {
+      "id": "valor_aluguel",
+      "name": "Valor do aluguel",
+      "tag": "{{VALOR_DO_ALUGUEL}}",
+      "type": "currency",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "Informe somente o valor; a prévia aplica a moeda brasileira.",
+      "validation": "currency",
+      "options": []
+    },
+    {
+      "id": "primeiro_vencimento",
+      "name": "Primeiro vencimento",
+      "tag": "{{PRIMEIRO_VENCIMENTO}}",
+      "type": "date",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "date",
+      "options": []
+    },
+    {
+      "id": "valor_caucao",
+      "name": "Valor da caução",
+      "tag": "{{VALOR_DA_CAUCAO}}",
+      "type": "currency",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "currency",
+      "options": []
+    },
+    {
+      "id": "limite_agua",
+      "name": "Limite mensal de água",
+      "tag": "{{LIMITE_MENSAL_DE_AGUA}}",
+      "type": "currency",
+      "required": false,
+      "defaultValue": "",
+      "helpText": "Deixe vazio quando a cláusula não se aplicar.",
+      "validation": "currency",
+      "options": []
+    },
+    {
+      "id": "moradores_autorizados",
+      "name": "Moradores autorizados",
+      "tag": "{{MORADORES_AUTORIZADOS}}",
+      "type": "textarea",
+      "required": false,
+      "defaultValue": "",
+      "helpText": "Informe os moradores autorizados somente durante a emissão.",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "comarca_foro",
+      "name": "Comarca do foro",
+      "tag": "{{COMARCA_DO_FORO}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "cidade_assinatura",
+      "name": "Cidade da assinatura",
+      "tag": "{{CIDADE_DA_ASSINATURA}}",
+      "type": "text",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "none",
+      "options": []
+    },
+    {
+      "id": "data_assinatura",
+      "name": "Data da assinatura",
+      "tag": "{{DATA_DA_ASSINATURA}}",
+      "type": "date",
+      "required": true,
+      "defaultValue": "",
+      "helpText": "",
+      "validation": "date",
+      "options": []
+    }
+  ]
+}
