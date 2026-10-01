@@ -95,6 +95,26 @@ test('carrega o gerador com a gestão como centro de navegação', async ({ page
   await expect(page.locator('#view-safety')).toBeVisible();
 });
 
+test('carrega o editor de templates sob demanda e usa o logo como recurso externo', async ({ page }) => {
+  const initialState = await page.evaluate(() => ({
+    engine: typeof window.TemplateDocumentEngine,
+    templateRequests: performance.getEntriesByType('resource').filter(entry => entry.name.includes('template-engine.js')).length
+  }));
+  expect(initialState).toEqual({ engine: 'undefined', templateRequests: 0 });
+
+  const logo = page.locator('#receipt .logo');
+  await expect(logo).toHaveAttribute('src', 'assets/paraiba-imoveis-logo.png');
+  await expect(logo).toHaveAttribute('width', '586');
+  await expect(logo).toHaveAttribute('height', '426');
+  await expect.poll(() => logo.evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight })))
+    .toEqual({ width: 586, height: 426 });
+
+  await selecionarAba(page, /Modelos/i);
+  await expect(page.locator('#templateStudio')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => typeof window.TemplateDocumentEngine)).toBe('object');
+  await expect.poll(() => page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('template-engine.js')))).toBe(true);
+});
+
 test('orienta a Gestão vazia para a primeira emissão', async ({ page }) => {
   await expect(page.locator('#managementEmptyState')).toBeVisible();
   await expect(page.locator('#managementEmptyState')).toContainText('Comece pela próxima emissão');
@@ -1307,6 +1327,39 @@ test('cancela e arquiva documentos sem diálogos nativos', async ({ page }) => {
 });
 
 test.describe('Regressões da auditoria técnica', () => {
+  test('reduz deslocamentos sem remover o feedback visual de estado', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await selecionarAba(page, /Novo documento/i);
+    await page.evaluate(() => window.paraibaDocumentApp.notify('Alteração salva.'));
+    await expect(page.locator('#toast')).toHaveClass(/show/);
+    await expect.poll(() => page.locator('#toast').evaluate(element => getComputedStyle(element).opacity)).toBe('1');
+
+    const motion = await page.evaluate(() => {
+      const view = getComputedStyle(document.querySelector('#view-new'));
+      const menu = getComputedStyle(document.querySelector('.tab-group-items'));
+      const toast = getComputedStyle(document.querySelector('#toast'));
+      const field = getComputedStyle(document.querySelector('#tenant'));
+      return {
+        viewAnimation: view.animationName,
+        menuTransform: menu.transform,
+        menuTransition: menu.transitionProperty,
+        toastTransform: toast.transform,
+        toastTransition: toast.transitionProperty,
+        toastOpacity: toast.opacity,
+        fieldTransition: field.transitionProperty
+      };
+    });
+
+    expect(motion.viewAnimation).toBe('none');
+    expect(motion.menuTransform).toBe('none');
+    expect(motion.menuTransition).toBe('opacity');
+    expect(motion.toastTransform).toBe('none');
+    expect(motion.toastTransition).toBe('opacity');
+    expect(Number(motion.toastOpacity)).toBeGreaterThan(0);
+    expect(motion.fieldTransition).toContain('border-color');
+    expect(motion.fieldTransition).not.toContain('transform');
+  });
+
   test('preserva o texto da Gestão com o espaçamento da WCAG 1.4.12', async ({ page }) => {
     await carregarEstadoGestao(page, estadoGestao({
       draftDocuments: [{
@@ -1430,6 +1483,7 @@ test.describe('Fase 3 — reflow, texto ampliado e toque', () => {
     ]) {
       await selecionarAba(page, view);
       if (reveal) await page.locator(reveal).click();
+      await page.locator(selector).first().waitFor({ state: 'visible' });
       const controls = await page.locator(selector).evaluateAll(elements => elements
         .filter(element => element.getClientRects().length && !['checkbox', 'radio'].includes(element.type))
         .map(element => ({

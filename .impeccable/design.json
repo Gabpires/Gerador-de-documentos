@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-29T22:51:51.0279515-03:00",
+  "generatedAt": "2026-10-01T08:54:04.4567000-03:00",
   "title": "Design System: Paraíba Imóveis",
   "extensions": {
     "colorMeta": {
@@ -67,8 +67,8 @@
       "muted": {
         "role": "neutral",
         "displayName": "Texto de Apoio",
-        "canonical": "#68717d",
-        "tonalRamp": ["#26303a", "#3f4a56", "#56616e", "#68717d", "#9098a2", "#b6bcc3", "#dce0e4", "#f4f5f6"]
+        "canonical": "#646d78",
+        "tonalRamp": ["#26303a", "#3f4a56", "#56616e", "#646d78", "#9098a2", "#b6bcc3", "#dce0e4", "#f4f5f6"]
       },
       "success": {
         "role": "tertiary",
@@ -94,6 +94,10 @@
         "displayName": "Título de Área",
         "purpose": "Nomeia áreas e contextos de trabalho sem disputar atenção com o documento."
       },
+      "title": {
+        "displayName": "Título de Painel",
+        "purpose": "Nomeia painéis, modais e seções principais com hierarquia estável."
+      },
       "body": {
         "displayName": "Texto Operacional",
         "purpose": "Sustenta instruções, documentos e dados de leitura prolongada."
@@ -101,6 +105,18 @@
       "label": {
         "displayName": "Rótulo de Campo",
         "purpose": "Nomeia cada dado antes da entrada e preserva a compreensão assistida."
+      },
+      "metric": {
+        "displayName": "Indicador Numérico",
+        "purpose": "Destaca totais operacionais com algarismos tabulares e peso forte."
+      },
+      "document": {
+        "displayName": "Texto Documental",
+        "purpose": "Preserva a composição da folha A4 com medidas tipográficas em pontos."
+      },
+      "code": {
+        "displayName": "Código de Template",
+        "purpose": "Distingue JSON e HTML editáveis no estúdio de templates."
       }
     },
     "shadows": [
@@ -122,14 +138,19 @@
     ],
     "motion": [
       {
-        "name": "entrada-de-aba",
-        "value": "0.18s ease-out",
+        "name": "continuidade-de-area",
+        "value": "180ms ease-out",
         "purpose": "Mostra a troca de área com deslocamento sutil e sem atrasar a operação."
       },
       {
+        "name": "feedback-de-estado",
+        "value": "120ms ease-out",
+        "purpose": "Mantém feedback de opacidade, cor, borda e foco perceptível sem coreografia adicional."
+      },
+      {
         "name": "movimento-reduzido",
-        "value": "0.01ms",
-        "purpose": "Respeita prefers-reduced-motion para animações e transições."
+        "value": "sem deslocamento espacial; feedback de estado em 120ms",
+        "purpose": "Respeita prefers-reduced-motion sem apagar opacidade, cor, foco ou confirmação de estado."
       }
     ],
     "breakpoints": [
@@ -164,9 +185,19 @@
       "alignment": "justified"
     },
     "buildBaseline": {
-      "before": { "css": "75.30 kB", "gzip": "15.27 kB" },
-      "after": { "css": "79.05 kB", "gzip": "14.79 kB" },
-      "justification": "As referências semânticas var(...) ampliam o texto bruto, mas eliminam cores literais e reduzem o artefato transferido em gzip."
+      "before": {
+        "html": "257.13 kB / 132.10 kB gzip",
+        "initialJavaScript": "209.16 kB / 62.54 kB gzip",
+        "css": "79.47 kB / 14.84 kB gzip"
+      },
+      "after": {
+        "html": "100.88 kB / 13.59 kB gzip",
+        "initialJavaScript": "181.96 kB / 54.08 kB gzip",
+        "lazyTemplateEngine": "28.50 kB / 9.76 kB gzip",
+        "css": "81.22 kB / 15.12 kB gzip",
+        "externalLogo": "117.26 kB PNG"
+      },
+      "justification": "O logo externo reduz o custo de parse do HTML e ganha cache independente; o editor de templates deixa o JavaScript inicial e é carregado somente quando necessário."
     }
   },
   "components": [
@@ -200,7 +231,7 @@
       "refersTo": "tab-active",
       "description": "Indica a área atual da operação dentro da navegação persistente.",
       "html": "<nav class=\"ds-tabs\" aria-label=\"Áreas\"><button class=\"ds-tab\" type=\"button\" aria-selected=\"true\">Novo documento</button><button class=\"ds-tab\" type=\"button\" aria-selected=\"false\">Histórico</button></nav>",
-      "css": ".ds-tabs { display: flex; gap: 5px; padding: 5px; border: 1px solid var(--border, #dde2e8); border-radius: 15px; background: var(--surface-translucent-nav, rgba(255, 255, 255, 0.94)); } .ds-tab { min-height: var(--control-min-size, 44px); padding: 9px 15px; border: 0; border-radius: var(--radius-tab, 10px); background: transparent; color: var(--muted-strong, #56616d); font: 800 12.5px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-tab:hover { background: var(--canvas, #eef1f5); } .ds-tab[aria-selected='true'] { background: var(--brand, #b70d18); color: var(--surface, #fff); box-shadow: 0 5px 14px var(--brand-shadow-color, rgba(183, 13, 24, 0.22)); } .ds-tab:focus-visible { outline: 0; box-shadow: var(--focus, 0 0 0 3px rgba(183, 13, 24, 0.16)); }"
+      "css": ".ds-tabs { display: flex; gap: 5px; padding: 5px; border: 1px solid var(--border, #dde2e8); border-radius: var(--radius-overlay, 16px); background: var(--surface-translucent-nav, rgba(255, 255, 255, 0.94)); } .ds-tab { min-height: var(--control-min-size, 44px); padding: 9px 15px; border: 0; border-radius: var(--radius-tab, 10px); background: transparent; color: var(--muted-strong, #56616d); font: 800 12.5px Inter, 'Segoe UI', Arial, sans-serif; cursor: pointer; } .ds-tab:hover { background: var(--canvas, #eef1f5); } .ds-tab[aria-selected='true'] { background: var(--brand, #b70d18); color: var(--surface, #fff); box-shadow: 0 5px 14px var(--brand-shadow-color, rgba(183, 13, 24, 0.22)); } .ds-tab:focus-visible { outline: 0; box-shadow: var(--focus, 0 0 0 3px rgba(183, 13, 24, 0.16)); }"
     },
     {
       "name": "Cartão de conteúdo",
@@ -208,7 +239,7 @@
       "refersTo": "content-card",
       "description": "Agrupa histórico, cadastros, modelos e segurança como superfícies de trabalho.",
       "html": "<section class=\"ds-card\"><h3>Histórico de documentos</h3><p>Consulte e filtre emissões registradas localmente.</p></section>",
-      "css": ".ds-card { padding: clamp(18px, 2.5vw, 28px); border: 1px solid var(--border, #dde2e8); border-radius: var(--radius-card, 20px); background: var(--surface, #fff); color: var(--text, #20242b); box-shadow: var(--shadow-ui, 0 12px 32px rgba(22, 29, 37, 0.08)); font: 400 14px/1.45 Inter, 'Segoe UI', Arial, sans-serif; } .ds-card h3 { margin: 0 0 4px; font-size: 18px; } .ds-card p { margin: 0; color: var(--muted, #68717d); }"
+      "css": ".ds-card { padding: clamp(18px, 2.5vw, 28px); border: 1px solid var(--border, #dde2e8); border-radius: var(--radius-card, 20px); background: var(--surface, #fff); color: var(--text, #20242b); box-shadow: var(--shadow-ui, 0 12px 32px rgba(22, 29, 37, 0.08)); font: 400 14px/1.45 Inter, 'Segoe UI', Arial, sans-serif; } .ds-card h3 { margin: 0 0 4px; font-size: 18px; } .ds-card p { margin: 0; color: var(--muted, #646d78); }"
     }
   ],
   "narrative": {

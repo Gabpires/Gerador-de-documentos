@@ -34,7 +34,9 @@ test('mantém um único bloco principal de tokens com os papéis obrigatórios',
     '--brand', '--info', '--surface', '--surface-muted', '--canvas',
     '--border', '--border-strong', '--text', '--muted',
     '--success', '--warning', '--danger',
-    '--radius-field', '--radius-button', '--shadow-ui', '--space-panel', '--control-min-size'
+    '--font-size-label', '--font-size-body', '--font-size-title', '--font-size-display', '--font-size-metric',
+    '--radius-compact', '--radius-field', '--radius-button', '--radius-section', '--radius-panel', '--radius-overlay', '--radius-card', '--radius-pill',
+    '--shadow-ui', '--space-panel', '--control-min-size'
   ]) {
     assert.match(css, new RegExp(`${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:`), `token ausente: ${token}`);
   }
@@ -54,6 +56,17 @@ test('restringe important às regras de impressão', () => {
     .map((line, index) => ({ line: index + 1, value: line.trim() }))
     .filter(({ value }) => value.includes('!important'));
   assert.deepEqual(lines, []);
+});
+
+test('reduz apenas o movimento espacial e preserva feedback de estado', () => {
+  const start = css.search(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/);
+  assert.notEqual(start, -1, 'media query de movimento reduzido ausente');
+  const openBrace = css.indexOf('{', start);
+  const block = css.slice(start, blockEnd(css, openBrace));
+  assert.doesNotMatch(block, /0\.01ms|\*::before|\*::after/);
+  assert.match(block, /\.view-panel\.is-active\s*\{[\s\S]*animation:\s*none/);
+  assert.match(block, /\.toast\s*\{[\s\S]*transition:\s*opacity 120ms ease-out/);
+  assert.match(block, /\.tab-group-items[\s\S]*transform:\s*none/);
 });
 
 test('documenta a ordem conceitual da arquitetura CSS', () => {

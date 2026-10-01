@@ -131,7 +131,7 @@ function staticFile(rootDir, pathname) {
   const candidate = resolve(rootDir, pathname === '/' ? 'index.html' : '.' + pathname);
   return candidate.startsWith(rootDir + sep) ? candidate : null;
 }
-function contentType(file) { return ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' })[extname(file)] || 'application/octet-stream'; }
+function contentType(file) { return ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' })[extname(file)] || 'application/octet-stream'; }
 const productionCsp = "default-src 'self'; base-uri 'none'; object-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'";
 async function start() {
   const dev = process.argv.includes('--dev');

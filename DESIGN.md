@@ -14,7 +14,7 @@ colors:
   border: "#dde2e8"
   border-strong: "#c9d0d8"
   text: "#20242b"
-  muted: "#68717d"
+  muted: "#646d78"
   success: "#237a43"
   success-soft: "#eaf7ee"
   warning: "#8a6116"
@@ -26,19 +26,45 @@ typography:
     fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
     fontSize: "clamp(20px, 2vw, 26px)"
     fontWeight: 700
+  title:
+    fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
+    fontSize: "20px"
+    fontWeight: 700
+    lineHeight: 1.25
   body:
     fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
     lineHeight: 1.45
   label:
     fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
     fontSize: "12px"
     fontWeight: 700
+  metric:
+    fontFamily: "Inter, 'Segoe UI', Arial, sans-serif"
+    fontSize: "clamp(20px, 1.6vw, 24px)"
+    fontWeight: 800
+    lineHeight: 1.1
+  document:
+    fontFamily: "Calibri, 'Carlito', 'Segoe UI', Arial, sans-serif"
+    fontSize: "10pt"
+    fontWeight: 400
+    lineHeight: 1.35
+  code:
+    fontFamily: "Consolas, 'Courier New', monospace"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.45
 rounded:
+  compact: "8px"
   field: "9px"
   button: "10px"
   tab: "10px"
   section: "12px"
+  panel: "13px"
+  overlay: "16px"
   card: "20px"
+  pill: "999px"
 spacing:
   tight: "8px"
   field: "13px"
@@ -135,8 +161,12 @@ A paleta é predominantemente neutra, com cor aplicada para prioridade, orienta�
 ### Hierarchy
 
 - **Display** (`{typography.display.fontWeight}`, `{typography.display.fontSize}`): títulos de áreas e contextos de trabalho.
-- **Body** (line-height de `{typography.body.lineHeight}`): instruções, conteúdo de documento e informação operacional.
+- **Title** (`{typography.title.fontWeight}`, `{typography.title.fontSize}`): títulos de painéis, modais e seções principais.
+- **Body** (`{typography.body.fontSize}`, line-height de `{typography.body.lineHeight}`): instruções, conteúdo de documento e informação operacional.
 - **Label** (`{typography.label.fontWeight}`, `{typography.label.fontSize}`): rótulos curtos e inequívocos antes de cada controle.
+- **Metric** (`{typography.metric.fontWeight}`, `{typography.metric.fontSize}`): indicadores numéricos de gestão, sempre com algarismos tabulares.
+- **Document** (`{typography.document.fontFamily}`): composição da folha A4, com medidas tipográficas em pontos.
+- **Code** (`{typography.code.fontFamily}`, `{typography.code.fontSize}`): JSON e HTML editáveis no estúdio de templates.
 
 **The Label-First Rule.** Nenhum campo depende de placeholder, cor ou posição para explicar seu propósito; o rótulo nomeia o dado antes da entrada.
 
@@ -164,7 +194,7 @@ O sistema é levemente em camadas, não flutuante. Cartões, painel do formulár
 
 ## Shapes
 
-Os cantos são suavemente arredondados: campos e abas compactos, seções intermediárias e cartões mais generosos. Bordas cinza claras fazem a maior parte da separação; a forma permanece estável e profissional, sem cápsulas excessivas ou geometrias chamativas.
+Os cantos são suavemente arredondados e seguem uma escala fechada: compacto (`{rounded.compact}`), campo (`{rounded.field}`), botão/aba (`{rounded.button}`), seção (`{rounded.section}`), painel (`{rounded.panel}`), sobreposição (`{rounded.overlay}`) e cartão (`{rounded.card}`). O raio de pílula (`{rounded.pill}`) é reservado a chips e estados. Bordas cinza claras fazem a maior parte da separação; a forma permanece estável e profissional, sem cápsulas excessivas ou geometrias chamativas.
 
 O foco visível é uma auréola institucional de três pixels. Controles mantêm altura útil de pelo menos 44px, preservando toque e navegação por teclado em todas as superfícies interativas.
 
@@ -224,7 +254,7 @@ As medidas de `210mm × 297mm`, os tamanhos em `pt/mm`, a tipografia documental 
 
 ### Build baseline
 
-O baseline anterior da folha compilada era **75,30 kB / 15,27 kB gzip**. Após a adoção de nomes semânticos para todas as cores de tela, o artefato ficou em **79,05 kB / 14,79 kB gzip**: o texto não comprimido cresce 3,75 kB por causa das referências `var(...)`, enquanto a transferência comprimida cai 0,48 kB. A variação bruta é aceita porque elimina cores literais e conflitos de cascata, e reduz o tamanho efetivamente transferido.
+Antes da otimização de carregamento, a produção entregava **257,13 kB / 132,10 kB gzip** de HTML e **209,16 kB / 62,54 kB gzip** de JavaScript inicial. O baseline atual entrega **100,88 kB / 13,59 kB gzip** de HTML e **181,96 kB / 54,08 kB gzip** de JavaScript inicial; o editor de templates ocupa um chunk sob demanda de **28,50 kB / 9,76 kB gzip**. O logo de **117,26 kB** agora é um recurso PNG externo, com dimensões declaradas e cache independente. A folha de estilos fica em **81,22 kB / 15,12 kB gzip** após a consolidação dos tokens de tipografia, forma e movimento.
 
 ## Do's and Don'ts
 
@@ -235,6 +265,7 @@ O baseline anterior da folha compilada era **75,30 kB / 15,27 kB gzip**. Após a
 - **Do** associe rótulos, ajuda, erro e foco ao campo correspondente; o estado deve ser entendido sem depender apenas de cor.
 - **Do** preserve o fluxo formulário → prévia A4 → confirmação → emissão, com ações críticas sempre alcançáveis.
 - **Do** adapte a estrutura para uma coluna e uma prévia dedicada no celular, mantendo controles de toque e leitura confortáveis.
+- **Do** use movimento curto apenas para continuidade de contexto e feedback; com `prefers-reduced-motion`, remova deslocamentos espaciais e preserve mudanças de opacidade, cor e estado em 120ms.
 
 ### Don't:
 

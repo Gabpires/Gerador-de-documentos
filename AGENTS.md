@@ -6,9 +6,9 @@ Este repositório é um front-end estático para gerar recibos, declarações, t
 
 | Papel | Instruções | Quando usar |
 | --- | --- | --- |
-| Desenvolvimento | `agents/desenvolvimento.md` | Implementar, corrigir ou refatorar comportamento. |
-| Testes | `agents/testes.md` | Criar, revisar ou executar testes e investigar regressões. |
-| Design | `agents/design.md` | Ajustar interface, responsividade, acessibilidade e impressão. |
+| Desenvolvimento | `.codex/agents/desenvolvimento.md` | Implementar, corrigir ou refatorar comportamento. |
+| Testes | `.codex/agents/testes.md` | Criar, revisar ou executar testes e investigar regressões. |
+| Design | `.codex/agents/design.md` | Ajustar interface, responsividade, acessibilidade e impressão. |
 
 Antes de atuar em um papel, leia o arquivo correspondente integralmente. Para uma tarefa que abranja mais de um papel, a ordem padrão é desenvolvimento, design e testes.
 

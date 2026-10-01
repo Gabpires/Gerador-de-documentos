@@ -283,7 +283,7 @@
     if (!readyForBatch.length) return;
     box.append(button(`Preparar emissão em lote (${readyForBatch.length})`, openBatch, 'btn btn-secondary'));
   }
-  function openBatch() { const batch = $('batchCard'); batch.open = true; batch.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  function openBatch() { const batch = $('batchCard'); batch.open = true; batch.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); }
   function row(label, value) { const item = document.createElement('div'); item.className = 'management-row'; const strong = document.createElement('strong'); strong.textContent = label; const span = document.createElement('span'); span.textContent = value; item.append(strong, span); return item; }
   function interactiveRow(item, action, label) { item.classList.add('is-interactive'); item.tabIndex = 0; item.setAttribute('role', 'button'); if (label) item.setAttribute('aria-label', label); item.addEventListener('click', action); item.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); action(); } }); return item; }
   function agendaRow(entry) { if (entry.kind === 'contract') { const item = row(entry.item.property, `Término em ${date(entry.item.endDate)}`); item.classList.add('warning-row'); return interactiveRow(item, () => selectDossier(entry.item.id), `Abrir dossiê ${entry.item.property}`); } const item = row(documentTitle(entry.record), STATUS[documentStatus(entry.record)]); return interactiveRow(item, () => openStatus(entry.record.recordId), `Atualizar situação de ${documentTitle(entry.record)}`); }

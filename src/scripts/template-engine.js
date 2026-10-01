@@ -244,7 +244,7 @@
       card.append(actions); box.append(card);
     });
   }
-  async function openTemplate(id) { try { populateStudio(await request(`${API}/${id}`)); $('templateEditorPanel').scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (error) { notice(error.message, true); } }
+  async function openTemplate(id) { try { populateStudio(await request(`${API}/${id}`)); $('templateEditorPanel').scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); } catch (error) { notice(error.message, true); } }
   async function archiveTemplate(id, restore) { try { await request(`${API}/${id}/${restore ? 'restore' : 'archive'}`, { method: 'POST', body: '{}' }); await loadCatalog(); notice(restore ? 'Template restaurado.' : 'Template arquivado.'); } catch (error) { notice(error.message, true); } }
   function command(command) { $('templateVisualEditor').focus(); document.execCommand(command, false); draft.html = visualHtml(); renderStudioPreview(); }
   function insertTag() { const tag = $('templateTagPicker').value; if (!tag) return; const editor = $('templateVisualEditor'); editor.focus(); const selection = window.getSelection(); if (!selection.rangeCount) { editor.append(document.createTextNode(tag)); } else { const range = selection.getRangeAt(0); range.deleteContents(); range.insertNode(document.createTextNode(tag)); range.collapse(false); selection.removeAllRanges(); selection.addRange(range); } draft.html = visualHtml(); renderStudioPreview(); }
@@ -374,5 +374,6 @@
   }
   function init() { if (!$('dynamicDocumentHost')) { const host = document.createElement('section'); host.id = 'dynamicDocumentHost'; host.hidden = true; $('view-new').prepend(host); } setupStudio(); }
   window.TemplateDocumentEngine = { startDocument, openRecord, printSnapshot, refreshCatalog: loadCatalog };
-  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 })();
